@@ -1,7 +1,7 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-jholland-mboned-driad-amt-discovery-00
+docname: draft-jholland-mboned-driad-amt-discovery-01
 date: 2018-10-18
 category: std
 
@@ -69,7 +69,8 @@ source dependent, since a relay must be able to receive multicast traffic
 from the desired source in order to forward it. It suggests DNS-based
 queries as a possible approach. This document defines a DNS-based solution,
 as suggested there. This solution also addresses the relay discovery issues
-outlined in {{RFC8313}}, in the "Disadvantages" lists in Sections 3.3 and 3.4.
+in the "Disadvantages" lists in Section 3.3 of {{RFC8313}} and Section 3.4
+of {{RFC8313}}.
 
 The goal is to enable multicast connectivity between separate multicast-enabled
 networks when neither the sending nor the receiving network is connected to
@@ -88,7 +89,7 @@ the usage of group management protocols for source-specific multicast as
 described in {{RFC4604}}.
 
 The reader should also be familiar with AMT, particularly the terminology
-listed in Section 3.2 and Section 3.3 of {{RFC7450}}.
+listed in Section 3.2 of {{RFC7450}} and Section 3.3 of {{RFC7450}}.
 
 It's especially helpful to recall that once an AMT tunnel is established,
 the relay receives native multicast traffic and encapsulates it into the
@@ -144,7 +145,8 @@ propagate the join signal to that relay. The goal for source-specific relay
 discovery in this situation is to ensure that the AMT relay chosen is able to
 receive multicast traffic from the given source. More detailed example use
 cases are provided in {{exrx}} and {{extx}}, and other applicable examples
-appear in {{RFC8313}}, Sections 3.3, 3.4, and 3.5.
+appear in Section 3.3 of {{RFC8313}}, Section 3.4 of {{RFC8313}}, and 
+Section 3.5 of {{RFC8313}}.
 
 Often an AMT gateway will only have access to the source and group IP addresses
 of the desired traffic, and will not know any other name for the source of the
@@ -293,6 +295,14 @@ For this reason, it's RECOMMENDED to provide an AMTRELAY RR referencing
 _amt._udp.home.arpa for sources, with a more-preferred precedence than the
 known relays close to source relays like those described in {{extx}}.
 
+Note also that this example is similar to several variations with minor
+differences that may be more common in practice, for example if the legacy
+unicast router is actually a VPN subnet overlay, or 
+
+Note also that this use case is a superset of the use cases experienced with
+a normal residential home network with only a combination Wifi router and
+modem with an external AMT relay plugged into the home router.
+
     <TBD>
 
       .home.arpa is pretty close to what's needed, but since this use case
@@ -438,7 +448,7 @@ The D bit is a "Discovery Optional" flag.
 
 If the D bit is set to 0, a gateway using this RR MUST perform AMT relay discovery as described in Section 4.2.1.1 of {{RFC7450}}, rather than directly sending an AMT request message to the relay.
 
-That is, the gateway MUST receive an AMT relay advertisement message (Section 5.1.2 of {{RFC7450}}) for an address before sending an AMT request message (Section 5.1.3 for {{RFC7450}}) to that address. Before receiving the relay advertisement message, this record has only indicated that the address can be used for AMT relay discovery, not for a request message.  This is necessary for devices that are not fully functional AMT relays, but rather load balancers or brokers, as mentioned in Section 4.2.1.1 of {{RFC7450}}.
+That is, the gateway MUST receive an AMT relay advertisement message (Section 5.1.2 of {{RFC7450}}) for an address before sending an AMT request message (Section 5.1.3 of {{RFC7450}}) to that address. Before receiving the relay advertisement message, this record has only indicated that the address can be used for AMT relay discovery, not for a request message.  This is necessary for devices that are not fully functional AMT relays, but rather load balancers or brokers, as mentioned in Section 4.2.1.1 of {{RFC7450}}.
 
 If the D bit is set to 1, the gateway MAY send an AMT request message directly to the discovered relay address without first sending an AMT discovery message.
 
@@ -549,8 +559,8 @@ numbers 4 through 255 can be assigned with a policy of Specification Required
 (see {{RFC8126}}).
 
     [TBD: should the relay type registry try to combine with the
-     gateway type from [RFC4025], Section 2.3 and 2.5? They are semantically
-     very similar.
+     gateway type from Section 2.3 of [RFC4025] and 
+     Section 2.5 of [RFC4025]? They are semantically very similar.
       https://www.ietf.org/assignments/
         ipseckey-rr-parameters/ipseckey-rr-parameters.xml
     ]
