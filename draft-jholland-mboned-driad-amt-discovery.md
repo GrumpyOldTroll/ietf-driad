@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-jholland-mboned-driad-amt-discovery-01
-date: 2018-10-18
+docname: draft-jholland-mboned-driad-amt-discovery-02
+date: 2018-11-13
 category: std
 
 ipr: trust200902
@@ -32,15 +32,16 @@ normative:
   RFC3597:
   RFC4604:
   RFC4607:
+  RFC6763:
   RFC7450:
   RFC8085:
   RFC8174:
 
 informative:
   RFC4025:
-  RFC4605:
   RFC5507:
   RFC6895:
+  RFC7359:
   RFC7761:
   RFC8126:
   RFC8313:
@@ -164,11 +165,8 @@ When the reverse IP mapping has no AMTRELAY RR but does have a PTR record,
 the lookup is done in the fashion usual for PTR records.  The IP
 address' octets (IPv4) or nibbles (IPv6) are reversed and looked up
 with the appropriate suffix.  Any CNAMEs or DNAMEs found MUST be
-followed, and the AMTRELAY RR is queried with the resulting domain name.
-
-When AMTRELAY RRs as defined in this document are available, it is
-RECOMMENDED that AMT gateways give the AMTRELAY RR precedence over AMT
-discovery using the anycast IPs defined in Section 7 of {{RFC7450}}.
+followed, and finally the AMTRELAY RR is queried with the resulting domain
+name.
 
 ##Example Receiving Networks {#exrx}
 
@@ -227,7 +225,11 @@ through a non-multicast next-hop.
 
 The office also hosts some mobile devices that have AMT gateway instances
 embedded in apps, in order to receive multicast traffic over their
-non-multicast wireless LAN.
+non-multicast wireless LAN.  (Note that the "Legacy Router" is a
+simplification that's meant to describe a variety of possible conditions--
+for example it could be a device providing a split-tunnel VPN as described
+in {{RFC7359}}, deliberately excluding multicast traffic for a VPN
+tunnel, rather than a device which is incapable of multicast forwarding.)
 
 ~~~
                  Internet
@@ -259,9 +261,7 @@ non-multicast wireless LAN.
 
 By adding an AMT relay to this office network as in {{figrxoffice}}, it's
 possible to make use of multicast services from the example multicast-capable
-ISP in {{exrxisp}}, provided that the AMT gateways contact the local AMT
-relay instead of an AMT relay upstream of the multicast-capable ISP, and the
-uplink router performs IGMP/MLD Proxying, as described in {{RFC4605}}.
+ISP in {{exrxisp}}.
 
 ~~~
            Multicast-capable ISP
@@ -291,42 +291,45 @@ uplink router performs IGMP/MLD Proxying, as described in {{RFC4605}}.
 ~~~
 {: #figrxoffice title="Small Office Example"}
 
-For this reason, it's RECOMMENDED to provide an AMTRELAY RR referencing
-_amt._udp.home.arpa for sources, with a more-preferred precedence than the
-known relays close to source relays like those described in {{extx}}.
+When multicast-capable networks are chained like this, with a network like
+the one in {{figrxoffice}} receiving internet services from a 
+multicast-capable network like the one in {{figrxisp}}, it's important for
+AMT gateways to reach the more local AMT relay, in order to avoid
+accidentally replicating multicast traffic from a more distant AMT relay,
+and failing to utilize the multicast transport capabilities of the network
+in {{figrxisp}}.
 
-Note also that this example is similar to several variations with minor
-differences that may be more common in practice, for example if the legacy
-unicast router is actually a VPN subnet overlay, or 
+For this reason, it's RECOMMENDED that AMT gateways by default perform
+service discovery using DNS Service Discovery (DNS-SD) {{RFC6763}} for
+_amt._udp.\<domain\> (with \<domain\> chosen as described in Section 11 of
+{{RFC6763}}) and use the AMT relays discovered that way in preference to
+AMT relays discoverable via the mechanism defined in this document (DRIAD).
 
-Note also that this use case is a superset of the use cases experienced with
-a normal residential home network with only a combination Wifi router and
-modem with an external AMT relay plugged into the home router.
+It's also RECOMMENDED that when the well-known anycast IP addresses defined
+in Section 7 of {{RFC7450}} are suitable for discovering an AMT relay that
+can forward traffic from the source, that a DNS record with the AMTRELAY
+RRType be published for those IP addresses along with any other appropriate
+AMTRELAY RRs to indicate the best relative precedences for
+receiving the source traffic.
 
-    <TBD>
+Accordingly, AMT gateways SHOULD by default discover the most-preferred relay
+first by DNS-SD, then by DRIAD as described in this document (in precedence
+order, as described in {{rrdef-precedence}}), then with the anycast
+addresses defined in Section 7 of {{RFC7450}} (namely: 192.52.193.1 and
+2001:3::1) if those IPs weren't listed in the AMTRELAY RRs.
+This default behavior MAY be overridden by administrative configuration where
+other behavior is more appropriate for the network.
 
-      .home.arpa is pretty close to what's needed, but since this use case
-      is not a residential home network, should this be another different
-      special-use domain name?
-
-      https://tools.ietf.org/html/rfc8375
-      https://www.iana.org/assignments/
-          locally-served-dns-zones/locally-served-dns-zones.xhtml
-          special-use-domain-names/special-use-domain-names.xhtml
-
-      e.g. _amt._udp.home.arpa
-      e.g. _amt._udp.most-local.arpa =>
-        .local if it's there,
-        .home.arpa if it's not,
-        .isp.arpa if it's not
-      (most-local because if somebody bothered to deploy a relay, they did
-       so in a spot where it can do a next-hop receive of multicast, as
-       long as no upstream gateway finds this relay and creates a loop.)
-
-      (Can/should "most-local.arpa" be done with the well-known anycast ip?
-      Not sure...)
-
-    <\TBD>
+The discovery and connection process for multiple relays MAY operate in
+parallel, but when forwarding multicast group membership information from
+the AMT gateway, it SHOULD be provided to the most-preferred relays first,
+falling back to less preferred relays only after failing to receive traffic
+for an appropriate timeout, and only after reporting a leave to any more-
+preferred connected relays that have failed to subscribe to the traffic.
+It is RECOMMENDED that the default timeout be no less than 3 seconds, but
+the value MAY be overridden by administrative configuration, where
+known groups or channels need a different timeout for successful
+application performance.
 
 ##Example Sending Networks {#extx}
 
@@ -419,7 +422,7 @@ length relay field.
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ~~~
 
-###RData Format - Precedence
+###RData Format - Precedence {#rrdef-precedence}
 
 This is an 8-bit precedence for this record.  It is interpreted in
 the same way as the PREFERENCE field described in Section 3.3.9 of
@@ -524,18 +527,6 @@ or (see {{extranslate}}):
                80 ; precedence
                83 ; D=1, relay type=3
                616d7472656c6179732e6578616d706c652e636f6d2e ) ; relay
-
-As described in {{exoffice}}, a record for _amt._udp.home.arpa SHOULD also
-be present with a more preferred precedence:
-
-      IN AMTRELAY 16 0 3 _amt._udp.home.arpa.
-
-or (see {{extranslate}}):
-
-      IN TYPE68  \# ( 22 ; length
-               10 ; precedence
-               03 ; D=0, relay type=3
-               5f616d742e5f7564702e686f6d652e617270612e ) ; relay
 
 #IANA Considerations {#iana}
 
