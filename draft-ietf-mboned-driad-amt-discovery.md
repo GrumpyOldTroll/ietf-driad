@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-00
-date: 2019-01-25
+docname: draft-ietf-mboned-driad-amt-discovery-01
+date: 2019-02-14
 category: std
 
 ipr: trust200902
@@ -36,20 +36,19 @@ normative:
   RFC3810:
   RFC4604:
   RFC4607:
+  RFC6724:
   RFC6763:
   RFC7450:
   RFC8085:
+  RFC8305:
   RFC8174:
 
 informative:
   RFC2317:
   RFC3550:
-  RFC4025:
   RFC4033:
   RFC5110:
-  RFC5507:
   RFC6726:
-  RFC6895:
   RFC7359:
   RFC7761:
   RFC8126:
@@ -58,34 +57,36 @@ informative:
 
 --- abstract
 
-This document updates RFC 7450 (AMT) by extending the relay discovery process
-to use a new DNS resource record for source-specific AMT relay discovery when
-joining source-specific multicast channels.  A multicast sender configures a
-reverse IP DNS zone with the new AMTRELAY RR (defined in this document) to
-advertise a set of relays that can receive and forward multicast traffic
-from that sender inside a unicast AMT tunnel, in order to transit
-non-multicast-capable network segments.
+This document updates RFC 7450 (Automatic Multicast Tunneling, or AMT) by
+extending the relay discovery process to use a new DNS resource record named
+AMTRELAY when discovering AMT relays for source-specific multicast channels.
+The reverse IP DNS zone for a multicast sender's IP address is configured to
+use AMTRELAY resource records to advertise a set of AMT relays that can
+receive and forward multicast traffic from that sender over an AMT tunnel.
 
 --- middle
 
 #Introduction        {#intro}
 
 This document defines DNS Reverse IP AMT Discovery (DRIAD), a mechanism for
-AMT gateways to discover AMT relays which are capable of forwarding multicast
+AMT gateways to discover AMT relays that are capable of forwarding multicast
 traffic from a known source IP address.
 
 AMT (Automatic Multicast Tunneling) is defined in {{RFC7450}}, and provides
 a method to transport multicast traffic over a unicast tunnel, in order to
 traverse non-multicast-capable network segments.
 
-Section 4.1.5 of {{RFC7450}} explains that relay selection might need to
-depend on the source of the multicast traffic, since a relay must be able
-to receive multicast traffic from the desired source in order to forward it.
+Section 4.1.5 of {{RFC7450}} explains that the relay selection process
+for AMT is intended to be more flexible than the particular discovery method
+described in that document, and further explains that the selection process
+might need to depend on the source of the multicast traffic in some
+deployments, since a relay must be able to receive multicast traffic from the
+desired source in order to forward it.
 
-That section suggests DNS-based queries as a possible solution.  DRIAD
-is a DNS-based solution, as suggested there.  This solution also addresses
-the relay discovery issues in the "Disadvantages" lists in Section 3.3 of
-{{RFC8313}} and Section 3.4 of {{RFC8313}}.
+That section goes on to suggest DNS-based queries as a possible solution.
+DRIAD is a DNS-based solution, as suggested there.  This solution also
+addresses the relay discovery issues in the "Disadvantages" lists in Section
+3.3 of {{RFC8313}} and Section 3.4 of {{RFC8313}}.
 
 The goal for DRIAD is to enable multicast connectivity between separate
 multicast-enabled networks when neither the sending nor the receiving network
@@ -132,7 +133,8 @@ them as native multicast packets, as illustrated in {{figtunnel}}.
    Term | Definition
    ----:|:----------
   (S,G) | A source-specific multicast channel, as described in {{RFC4607}}. A pair of IP addresses with a source host IP and destination group IP.
-downstream | Further from the source of traffic.
+discovery broker | A broker or load balancer for AMT relay discovery, as mentioned in section 4.2.1.1 of {{RFC7450}}.
+downstream | Further from the source of traffic, as described in {{RFC7450}}.
    FQDN | Fully Qualified Domain Name, as described in {{RFC8499}}
 gateway | An AMT gateway, as described in {{RFC7450}}
  L flag | The "Limit" flag described in Section 5.1.1.4 of {{RFC7450}}
@@ -141,7 +143,7 @@ gateway | An AMT gateway, as described in {{RFC7450}}
      RR | A DNS Resource Record, as described in {{RFC1034}}
  RRType | A DNS Resource Record Type, as described in {{RFC1034}}
     SSM | Source-specific multicast, as described in {{RFC4607}}
-upstream | Closer to the source of traffic.
+upstream | Closer to the source of traffic, as described in {{RFC7450}}.
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
 "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
@@ -154,12 +156,14 @@ capitals, as shown here.
 ##Overview
 
 The AMTRELAY resource record (RR) defined in this document is used to
-publish the IP address or domain name of an AMT relay that can receive,
-encapsulate, and forward multicast traffic from a particular sender.
+publish the IP address or domain name of a set of AMT relays or discovery
+brokers that can receive, encapsulate, and forward multicast traffic from
+a particular sender.
 
-The sender is the owner of the RR, and configures the RR so that it contains
-the address or domain name of an AMT relay that can receive multicast IP
-traffic from that sender.
+The sender is the owner of the RR, and configures the zone so that it
+contains a set of RRs that provide the addresses or domain names of AMT
+relays (or discovery brokers that advertise relays) that can receive
+multicast IP traffic from that sender.
 
 This enables AMT gateways in remote networks to discover an AMT relay that
 is capable of forwarding traffic from the sender.  This in turn enables those
@@ -174,7 +178,7 @@ reverse mapping trees (in-addr.arpa for IPv4, as described in Section 3.5 of
 {{RFC1035}}, or ip6.arpa for IPv6, as described in Section 2.5 of {{RFC3596}}).
 
 This mechanism should be treated as an extension of the AMT relay discovery
-procedure described in section 5.2.3.4 of {{RFC7450}}.  A gateway that
+procedure described in Section 5.2.3.4 of {{RFC7450}}.  A gateway that
 supports this method of AMT relay discovery SHOULD use this method
 whenever it's performing the relay discovery procedure, and the source IP
 addresses for desired (S,G)s are known to the gateway, and conditions match
@@ -277,13 +281,48 @@ The sequence of events depicted in {{figmessaging}} is as follows:
     gateway, which decapsulates and forwards it as native multicast through
     its downstream network to the end user.
 
+##Happy Eyeballs {#happy}
+
+###Overview
+
+Often, multiple choices of relay will exist for a gateway using DRIAD
+for relay discovery.  It is RECOMMENDED that DRIAD-capable gateways
+implement a Happy Eyeballs {{RFC8305}} algorithm to support connecting to
+multiple relays in parallel.
+
+The parallel discovery logic of a Happy Eyeballs algorithm serves to
+reduce join latency for the initial join of a SSM channel.  This section
+and {{ordering}} taken together provide guidance on use of a Happy
+Eyeballs algorithm for the case of establishing AMT connections.
+
+###Connection Definition
+
+Section 5 of {{RFC8305}} non-normatively describes success at a
+connection attempt as "generally when the TCP handshake completes".
+
+There is no normative definition of a connection in the AMT specification
+{{RFC7450}}, and there is no TCP connection involved in an AMT tunnel.
+
+However, the concept of an AMT connection in the context of a Happy
+Eyeballs algorithm is a useful one, and so this section provides the
+following normative definition:
+
+ * An AMT connection is completed successfully when the gateway receives
+   from a newly discovered relay a valid Membership Query message
+   (Section 5.1.4 of {{RFC7450}}) that does not have the L flag set.
+
+See {{loaded}} for further information about the relevance of the L
+flag to the establishment of a Happy Eyeballs connection.
+
 ##Optimal Relay Selection {#priority}
+
+###Overview
 
 The reverse source IP DNS query of an AMTRELAY RR is a good way for a gateway
 to discover a relay that is known to the sender.
 
 However, it is NOT necessarily a good way to discover the best relay for that
-gateway to use, because the RR IP will only provide information about relays
+gateway to use, because the RR will only provide information about relays
 known to the source.
 
 If there is an upstream relay in a network that is topologically closer to
@@ -308,16 +347,126 @@ an AMTRELAY RR owned by a sender when all of these conditions are met:
  4. The gateway is not able to find an upstream AMT relay with DNS-SD
     {{RFC6763}}, using "_amt._udp" as the Service section of the queries, or a
     relay discovered this way is not able to forward traffic from the source of
-    the (S,G)
+    the (S,G) (as described in {{trafficabsent}} or {{loaded}}).
 
 When the above conditions are met, the gateway has no path within its local
 network that can receive multicast traffic from the source IP of the (S,G).
 
 In this situation, the best way to find a relay that can forward the
 required traffic is to use information that comes from the operator of the
-sender.  When the sender has configured the AMTRELAY RR defined in this
-document, gateways can use the DRIAD mechanism defined in this document to
-discover the relay information provided by the sender.
+sender.  When the sender has configured an AMTRELAY RR, gateways can use the
+DRIAD mechanism defined in this document to discover the relay information
+provided by the sender.
+
+###Preference Ordering {#ordering}
+
+This section defines a preference ordering for relay addresses during
+the relay discovery process.  Gateways are encouraged to implement a
+Happy Eyeballs algorithm, but even gateways that do not implement a
+Happy Eyeballs algorithm SHOULD use this ordering, except as noted.
+
+When establishing an AMT tunnel to forward multicast data, it's
+very important for the discovery process to prioritize the network
+topology considerations ahead of address selection considerations, in order to
+gain the packet replication benefits from using multicast instead of unicast
+tunneling in the multicast-capable portions of the network path.
+
+The intent of the advice and requirements in this section is to describe
+how a gateway should make use of the concurrency provided by a Happy Eyeballs
+algorithm to reduce the join latency, while still prioritizing network
+efficiency considerations over Address Selection considerations.
+
+Section 4 of {{RFC8305}} requires a Happy Eyeballs algorithm to sort
+the addresses with the Destination Address Selection defined in Section
+6 of {{RFC6724}}, but for the above reasons, that requirement is superseded
+in the AMT discovery use case by the following considerations:
+
+ 1. Prefer Local Relays
+
+    {{figrxoffice}} and {{exoffice}} provide a motivating example to prefer
+    DNS-SD {{RFC6763}} for discovery strictly ahead of using the AMTRELAY RR
+    controlled by the sender for AMT discovery.
+
+    For this reason, it's RECOMMENDED that AMT gateways by default perform
+    service discovery using DNS Service Discovery (DNS-SD) {{RFC6763}} for
+    _amt._udp.\<domain\> (with \<domain\> chosen as described in Section 11 of
+    {{RFC6763}}) and use the AMT relays discovered that way in preference to
+    AMT relays discoverable via the mechanism defined in this document
+    (DRIAD).
+
+ 2. Let Sender Manage Relay Provisioning
+
+    A related motivating example in the sending-side network is provided by
+    considering a sender which needs to instruct the gateways on how to
+    select between connecting to {{figtxrelay}} or {{figtxisp}} (from
+    {{extx}}), in order to manage load and failover scenarios in a manner
+    that operates well with the sender's provisioning strategy for
+    horizontal scaling of AMT relays.
+
+    In this example about the sending-side network, the precedence field
+    described in {{rrdef-precedence}} is a critical method of control so
+    that senders can provide the appropriate guidance to gateways
+    during the discovery process.
+
+    Therefore, after DNS-SD, the precedence from the RR MUST be used for
+    sorting preference ahead of the Destination Address Selection ordering
+    from Section 6 of {{RFC6724}}, so that only relay IPs with the same
+    precedence are directly compared according to the Destination Address
+    Selection ordering.
+
+ 3. Let Sender Manage Non-DRIAD discovery
+
+    It's also RECOMMENDED that if the well-known anycast IP addresses
+    defined in Section 7 of {{RFC7450}} are suitable for discovering an AMT
+    relay that can forward traffic from the source, that a DNS record with
+    the AMTRELAY RRType be published by the sender for those IP addresses
+    along with any other appropriate AMTRELAY RRs to indicate the best
+    relative precedences for receiving the source traffic.
+
+Accordingly, AMT gateways SHOULD by default prefer relays
+first by DNS-SD if available, then by DRIAD as described in this
+document (in precedence order, as described in {{rrdef-precedence}}), then
+with the anycast addresses defined in Section 7 of {{RFC7450}} (namely:
+192.52.193.1 and 2001:3::1) if those IPs weren't listed in the AMTRELAY RRs.
+
+This default behavior MAY be overridden by administrative configuration where
+other behavior is more appropriate for the gateway within its network.
+
+Among relay addresses that have an equivalent preference as described above, a
+Happy Eyeballs algorithm for AMT MUST use the Destination Address Selection
+defined in Section 6 of {{RFC6724}}, as required by {{RFC8305}}.
+
+Among relay addresses that still have an equivalent preference after the
+above orderings, a gateway MUST make a non-deterministic choice for relay
+preference ordering, in order to support load balancing by DNS
+configurations that provide many relay options.  (Note that gateways not
+implementing a Happy Eyeballs algorithm are not required to use the
+Destination Address Selection ordering, but are still required to use
+non-deterministic ordering among equally preferred relays.)
+
+Note also that certain relay addresses may be excluded from consideration
+by the hold-down timers described in {{trafficabsent}} or {{loaded}}.  These
+relays constitute "unusable destinations" under Rule 1 of the Destination
+Address Selection, and are also not part of the superseding considerations
+described above.
+
+The discovery and connection process for the relay addresses in the above
+described ordering MAY operate in parallel, subject to delays prescribed
+by the Happy Eyeballs requirements described in Section 5 of {{RFC8305}}
+for successively launched concurrent connection attempts.
+
+###Connecting to Multiple Relays
+
+In some deployments, it may be useful for a gateway to connect to
+multiple upstream relays and subscribe to the same traffic, in order to
+support an active/active failover model.  A gateway SHOULD NOT be
+configured to do so without guaranteeing that adequate bandwidth is
+available.
+
+A gateway configured to do this SHOULD still use the same preference
+ordering logic from {{ordering}} for both connections.  (Note that
+this ordering allows for overriding by explicit administrative
+configuration where required.)
 
 ##Guidelines for Restarting Discovery
 
@@ -328,16 +477,37 @@ variety of heuristics to decide when it's appropriate to restart the relay
 discovery process, in order to meet different performance goals (for example,
 to fulfill different kinds of service level agreements).
 
-The advice in this section should be treated as non-normative guidelines to
+In general, restarting the discovery process is always safe for
+the gateway and relay during any of the events listed in this section,
+but may cause a disruption in the forwarded traffic if the discovery
+process results in choosing a different relay, because this changes
+the RPF forwarding tree for the multicast traffic upstream of the gateway.
+This is likely to result in some dropped or duplicated packets from channels
+actively being tunneled from the old relay to the gateway.
+
+The degree of impact on the traffic from choosing a different relay may
+depend on network conditions between the gateway and the new relay, as well
+as the network conditions and topology between the sender and the new relay,
+as this may cause the relay to propagate a new RPF join toward the sender.
+
+Balancing the expected impact on the tunneled traffic against likely
+or observed problems with an existing connection to the relay is the goal
+of the heuristics that gateways use to determine when to restart the
+discovery process.
+
+The non-normative advice in this section should be treated as guidelines to
 operators and implementors working with AMT systems that can use DRIAD as
 part of the relay discovery process.
+
+###Updates to Restarting Events
 
 Section 5.2.3.4.1 of {{RFC7450}} lists several events that may cause a
 gateway to start or restart the discovery procedure.
 
 This document provides some updates and recommendations regarding the
-handling of these and similar events.  The events are copied here and
-numbered for easier reference:
+handling of these and similar events.  The first 5 events are copied
+here and numbered for easier reference, and the following events are
+newly added for consideration in this document:
 
  1. When a gateway pseudo-interface is started (enabled).
 
@@ -353,26 +523,24 @@ numbered for easier reference:
  5. After the gateway receives a Membership Query message with the
     L flag set to 1.
 
-There are several new events that gateway heuristics may appropriately
-use to restart the discovery process, including:
-
  6. When the gateway wishes to report a (S,G) subscription with a source
     address that does not currently have other group subscriptions.
 
- 7. When the DNS TTL expires for an AMTRELAY RR or for a domain name contained
-    within the AMTRELAY RR.
-
- 8. When there is a network change detected, for example when a gateway is
+ 7. When there is a network change detected, for example when a gateway is
     operating inside an end user device or application, and the device
     joins a different network, or when the domain portion of a DNS-SD
     domain name changes in response to a DHCP message or administrative
     configuration.
 
- 9. When loss or congestion is detected in the stream of AMT packets from
-    a relay.
+ 8. When congestion or substantial loss is detected in the stream of AMT
+    packets from a relay.
 
-This list is not exhaustive, nor are any of the listed events always strictly
-required to force a restart of the discovery process.
+ 9. When the gateway has reported one or more (S,G) subscriptions, but
+    no traffic is received from the source for some timeout.  (See
+    {{trafficabsent}}).
+
+This list is not exhaustive, nor are any of the listed events strictly
+required to always force a restart of the discovery process.
 
 Note that during event #1, a gateway may use DNS-SD, but does not
 have sufficient information to use DRIAD, since no source is known.
@@ -385,24 +553,51 @@ by an AMT gateway are less likely to experience a degradation in service
 using the same relay, as long the relay is not overloaded and the network
 conditions remain stable.
 
-Therefore, gateways should avoid performing a full restart of the discovery
+Therefore, gateways SHOULD avoid performing a full restart of the discovery
 process during routine cases of event #3 (sending a new Request message),
-but see {{relayloading}} and {{discoverymessage}} for more information about
-exceptions when it may be appropriate to use this event.
+since it occurs frequently in normal operation.
 
-Likewise, some operators might use a short DNS TTL expiration (event #7) to
-allow for more responsive load balancing.  If a gateway frequently sees
-short DNS TTLs (for example, under approximately 15 minutes) for some
-sources, a helpful heuristic may be to avoid restarting the discovery
-process for those sources, for example with an exponential backoff, or a
-hold-down timer that depends on the health or bit-rate of the active and
-subscribed traffic currently being forwarded through the tunnel.
+However, see {{flowhealth}}, {{discoverymessage}}, and {{ancient}} for more
+information about exceptional cases when it may be appropriate to use
+event #3.
 
-###Flow Health {#relayloading}
+###Traffic Health {#flowhealth}
 
-In some gateway deployments, it is feasible to monitor the health of
+####Absence of Traffic {#trafficabsent}
+
+If a gateway indicates one or more (S,G) subscriptions in a Membership
+Update message, but no traffic for any of the (S,G)s is received in a
+reasonable time, it's appropriate for the gateway to restart the
+discovery process.
+
+If the gateway restarts the discovery process multiple times consecutively
+for this reason, the timeout period SHOULD be adjusted to provide a random
+exponential back-off.
+
+The RECOMMENDED timeout is a random value in the range
+\[initial_timeout, MIN(initial_timeout * 2^retry_count, maximum_timeout)\],
+with a RECOMMENDED initial_timeout of 4 seconds and
+a RECOMMENDED maximum_timeout of 120 seconds.
+
+Note that the recommended initial_timeout is larger than the initial 
+timout recommended in the similar algorithm from Section 5.2.3.4.3 of
+{{RFC7450}}.  This is to provide time for RPF Join propagation in the
+sending network.  Although the timeout values may be administratively
+adjusted to support performance requirements, operators are advised to
+consider the possibility of join propagation delays between the sender
+and the relay when choosing an appropriate timeout value.
+
+Gateways restarting the discovery process because of an absence of
+traffic MUST use a hold-down timer that removes this relay from
+consideration during subsequent rounds of discovery while active.
+The hold-down SHOULD last for no less than 3 minutes and no more than
+10 minutes.
+
+####Loss and Congestion
+
+In some gateway deployments, it is also feasible to monitor the health of
 traffic flows through the gateway, for example by detecting the rate of
-packet loss by communicating out of band with clients, or monitoring
+packet loss by communicating out of band with receivers, or monitoring the
 packets of known protocols with sequence numbers.  Where feasible,
 it's encouraged for gateways to use such traffic health information to
 trigger a restart of the discovery process during event #3 (before
@@ -417,18 +612,45 @@ The span of the random portion of the delay should be no less than 10
 seconds by default, but may be administratively configured
 to support different performance requirements.
 
-###Relay Loading and Shutdown
+####Ancient Discovery Information {#ancient}
 
-The L flag (see Section 5.1.4.4 of {{RFC7450}} is the preferred mechanism for
+In most cases, a gateway actively receiving healthy traffic from a relay
+that has not indicated load with the L flag should prefer to remain
+connected to the same relay, as described in {{stability}}.
+
+However, a relay that appears healthy but has been forwarding traffic for
+days or weeks may have an increased chance of becoming unstable.  Gateways
+may benefit from restarting the discovery process during event #3 (before
+sending a Request message) after the expiration of a long-term timeout, on
+the order of multiple hours, or even days in some deployments.
+
+It may be beneficial for such timers to consider the amount of traffic
+currently being forwarded, and to give a higher probability of restarting
+discovery during periods with an unusually low data rate, to reduce the
+impact on active traffic while still avoiding relying on the results of a
+very old discovery.
+
+Other issues may also be worth considering as part of this heuristic; for
+example, if the DNS expiry time of the record that was used to discover
+the current relay has not passed, the long term timer might be restarted
+without restarting the discovery process.
+
+###Relay Loaded or Shutting Down {#loaded}
+
+The L flag (see Section 5.1.4.4 of {{RFC7450}}) is the preferred mechanism for
 a relay to signal overloading or a graceful shutdown to gateways.
 
 A gateway that supports handling of the L flag should generally restart the
 discovery process when it processes a Membership Query packet with the
-L flag set.  It is also recommended that gateways avoid choosing a relay
+L flag set.  If an L flag is received while a concurrent Happy Eyeballs
+discovery process is under way for multiple candidate relays ({{happy}}),
+the relay sending the L flag SHOULD NOT be considered for the relay selection.
+
+It is also RECOMMENDED that gateways avoid choosing a relay
 that has recently sent an L flag, with approximately a 10-minute hold-down.
-Gateways MAY use heuristics such as this hold-down to override selection
-of a relay preferred by the precedence field in the AMTRELAY RR (see
-{{rrdef-precedence}}).
+Gateways SHOULD treat this hold-down timer in the same way as the hold-down
+in {{trafficabsent}}, so that the relay is removed from consideration
+for short-term subsequent rounds of discovery.
 
 ###Relay Discovery Messages vs. Restarting Discovery {#discoverymessage}
 
@@ -466,7 +688,7 @@ for gateways to support the L flag, but for gateways that do not support the
 L flag, sending this message during event #3 may help mitigate service
 degradation when relays become unstable.
 
-###Connecting to Multiple Relays
+###Independent Discovery Per Traffic Source
 
 Relays discovered via the AMTRELAY RR are source-specific relay addresses, and
 may use different pseudo-interfaces from each other and from relays
@@ -651,40 +873,6 @@ accidentally tunneling multicast traffic from a more distant AMT relay with
 unicast, and failing to utilize the multicast transport capabilities of the
 network in {{figrxisp}}.
 
-For this reason, it's RECOMMENDED that AMT gateways by default perform
-service discovery using DNS Service Discovery (DNS-SD) {{RFC6763}} for
-_amt._udp.\<domain\> (with \<domain\> chosen as described in Section 11 of
-{{RFC6763}}) and use the AMT relays discovered that way in preference to
-AMT relays discoverable via the mechanism defined in this document (DRIAD).
-
-It's also RECOMMENDED that when the well-known anycast IP addresses defined
-in Section 7 of {{RFC7450}} are suitable for discovering an AMT relay that
-can forward traffic from the source, that a DNS record with the AMTRELAY
-RRType be published for those IP addresses along with any other appropriate
-AMTRELAY RRs to indicate the best relative precedences for receiving the
-source traffic.
-
-Accordingly, AMT gateways SHOULD by default discover the most-preferred relay
-first by DNS-SD, then by DRIAD as described in this document (in precedence
-order, as described in {{rrdef-precedence}}), then with the anycast
-addresses defined in Section 7 of {{RFC7450}} (namely: 192.52.193.1 and
-2001:3::1) if those IPs weren't listed in the AMTRELAY RRs.
-This default behavior MAY be overridden by administrative configuration where
-other behavior is more appropriate for the gateway within its network.
-
-The discovery and connection process for multiple relays MAY operate in
-parallel, but when forwarding multicast group membership reports with new
-joins from an AMT gateway, membership reports SHOULD be forwarded to the
-most-preferred relays first, falling back to less preferred relays only after
-failing to receive traffic for an appropriate timeout, and only after reporting
-a leave to any more- preferred connected relays that have failed to subscribe
-to the traffic.
-
-It is RECOMMENDED that the default timeout for receiving traffic be no less
-than 3 seconds, but the value MAY be overridden by administrative
-configuration, where known groups or channels need a different timeout for
-successful application performance.
-
 ##Example Sending Networks {#extx}
 
 ###Sender-controlled Relays
@@ -693,7 +881,7 @@ When a sender network is also operating AMT relays to distribute multicast
 traffic, as in {{figtxrelay}}, each address could appear as an AMTRELAY RR
 for the reverse IP of the sender, or one or more domain names could appear
 in AMTRELAY RRs, and the AMT relay addresses can be discovered by finding
-an A or AAAA record from those domain names.
+a A or AAAA records from those domain names.
 
 ~~~
                                       Sender Network
@@ -718,9 +906,8 @@ an A or AAAA record from those domain names.
 When an ISP offers a service to transmit outbound multicast traffic through
 a forwarding network, it might also offer AMT relays in order to reach
 receivers without multicast connectivity to the forwarding network, as in
-{{figtxisp}}. In this case it's RECOMMENDED that the ISP also provide a domain
-name for the AMT relays for use with the discovery process defined in this
-document.
+{{figtxisp}}. In this case it's RECOMMENDED that the ISP also provide at
+least one domain name for the AMT relays for use with the AMTRELAY RR.
 
 When the sender wishes to use the relays provided by the ISP for
 forwarding multicast traffic, an AMTRELAY RR should be configured to use
@@ -758,7 +945,9 @@ RRs.
 
 ##AMTRELAY RRType
 
-The AMTRELAY RRType has the mnemonic AMTRELAY and type code TBD1 (decimal).
+The AMTRELAY RRType has the mnemonic AMTRELAY and type code 260 (decimal).
+
+The AMTRELAY RR is class independent.
 
 ##AMTRELAY RData Format
 
@@ -785,38 +974,24 @@ the same way as the PREFERENCE field described in Section 3.3.9 of
 Relays listed in AMTRELAY records with a lower value for precedence are to be
 attempted first.
 
-Where there is a tie in precedence, the default choice of relay MUST be
-non-deterministic, to support load balancing. The AMT gateway operator
-MAY override this default choice with explicit configuration when it's
-necessary for administrative purposes.
-
-For example, one network might prefer to tunnel IPv6 multicast traffic over
-IPv6 AMT and IPv4 multicast traffic over IPv4 AMT to avoid routeability
-problems in IPv6 from affecting IPv4 traffic and vice versa, while another
-network might prefer to tunnel both kinds of traffic over IPv6 to reduce the
-IPv4 space used by its AMT gateways. In this example scenario or other cases
-where there is an administrative preference that requires explicit
-configuration, a receiving network MAY make systematically different
-precedence choices among records with the same precedence value.
-
 ###RData Format - Discovery Optional (D-bit) {#rrdef-dbit}
 
 The D bit is a "Discovery Optional" flag.
 
 If the D bit is set to 0, a gateway using this RR MUST perform AMT relay
 discovery as described in Section 4.2.1.1 of {{RFC7450}}, rather than directly
-sending an AMT request message to the relay.
+sending an AMT Request message to the relay.
 
-That is, the gateway MUST receive an AMT relay advertisement message (Section
-5.1.2 of {{RFC7450}}) for an address before sending an AMT request message
-(Section 5.1.3 of {{RFC7450}}) to that address. Before receiving the relay
-advertisement message, this record has only indicated that the address can be
-used for AMT relay discovery, not for a request message.  This is necessary for
+That is, the gateway MUST receive an AMT Relay Advertisement message (Section
+5.1.2 of {{RFC7450}}) for an address before sending an AMT Request message
+(Section 5.1.3 of {{RFC7450}}) to that address. Before receiving the Relay
+Advertisement message, this record has only indicated that the address can be
+used for AMT relay discovery, not for a Request message.  This is necessary for
 devices that are not fully functional AMT relays, but rather load balancers or
 brokers, as mentioned in Section 4.2.1.1 of {{RFC7450}}.
 
-If the D bit is set to 1, the gateway MAY send an AMT request message directly
-to the discovered relay address without first sending an AMT discovery message.
+If the D bit is set to 1, the gateway MAY send an AMT Request message directly
+to the discovered relay address without first sending an AMT Discovery message.
 
 This bit should be set according to advice from the AMT relay operator. The
 D bit MUST be set to zero when no information is available from the AMT relay
@@ -863,6 +1038,13 @@ When the type field is 3, the relay field is a normal wire-encoded domain
 name, as described in Section 3.3 of {{RFC1035}}. Compression MUST NOT be
 used, for the reasons given in Section 4 of {{RFC3597}}.
 
+For a type 3 record, the D-bit and preference fields carry over to all
+A or AAAA records for the domain name.  There is no difference in the
+result of the discovery process when it's obtained by type 1 or type 2
+AMTRELAY records with identical D-bit and preference fields, vs. when
+the result is obtained by a type 3 AMTRELAY record that resolves
+to the same set of IPv4 and IPv6 addresses via A and AAAA lookups.
+
 ##AMTRELAY Record Presentation Format {#rpformat}
 
 ###Representation of AMTRELAY RRs
@@ -900,21 +1082,18 @@ natively, it's possible to use the format for unknown RR types, as
 described in {{RFC3597}}.  This approach would replace the AMTRELAY
 entries in the example above with the entries below:
 
-  \[To be removed (TBD): replace 65280 with the IANA-assigned value
-   TBD1, here and in Appendix B. \]
-
 ~~~
-    10   IN TYPE65280  \# (
+    10   IN TYPE260  \# (
            6  ; length
            0a ; precedence=10
            01 ; D=0, relay type=1, an IPv4 address
            cb00710f ) ; 203.0.113.15
-    10   IN TYPE65280  \# (
+    10   IN TYPE260  \# (
            18 ; length
            0a ; precedence=10
            02 ; D=0, relay type=2, an IPv6 address
            20010db800000000000000000000000f ) ; 2001:db8::15
-    10   IN TYPE65280  \# (
+    10   IN TYPE260  \# (
            24 ; length
            80 ; precedence=128
            83 ; D=1, relay type=3, a wire-encoded domain name
@@ -926,9 +1105,11 @@ See {{extranslate}} for more details.
 #IANA Considerations {#iana}
 
 This document updates the IANA Registry for DNS Resource Record Types
-by assigning type TBD1 to the AMTRELAY record.
+by assigning type 260 to the AMTRELAY record.
 
-This document creates a new registry named "AMTRELAY Resource Record Parameters", with a sub-registry for the "Relay Type Field".  The initial values in the sub-registry are:
+This document creates a new registry named "AMTRELAY Resource Record
+Parameters", with a sub-registry for the "Relay Type Field".  The initial
+values in the sub-registry are:
 
 ~~~
          +-------+---------------------------------------+
@@ -986,78 +1167,6 @@ Giuliano, and Mark Andrews for their very helpful comments.
 
 --- back
 
-#New RRType Request Form
-
-This is the template for requesting a new RRType recommended in
-Appendix A of {{RFC6895}}.
-
-~~~
-A. Submission Date:
-
-B.1 Submission Type:
- [x] New RRTYPE  [ ] Modification to RRTYPE
-B.2 Kind of RR:
- [x] Data RR     [ ] Meta-RR
-
-C. Contact Information for submitter (will be publicly posted):
- Name:  Jake Holland
- Email Address: jakeholland.net@gmail.com
- International telephone number: +1-626-486-3706
- Other contact handles: jholland@akamai.com
-
-D. Motivation for the new RRTYPE application.
- It provides a bootstrap so AMT (RFC 7450) gateways can discover
- an AMT relay that can receive multicast traffic from a specific source,
- in order to signal multicast group membership and receive multicast
- traffic over a unicast tunnel using AMT.
-
-E. Description of the proposed RR type.
-   This description can be provided in-line in the template, as an
-   attachment, or with a publicly available URL.
- Please see draft-ietf-mboned-driad-amt-discovery.
-
-F. What existing RRTYPE or RRTYPEs come closest to filling that need
-   and why are they unsatisfactory?
- Some similar concepts appear in IPSECKEY, as described in
- Section 1.2 of [RFC4025]. The IPSECKEY RRType is unsatisfactory
- because it refers to IPSec Keys instead of to AMT relays, but
- the motivating considerations for using reverse IP and for
- providing a precedence are similar--an AMT gateway often
- has access to a source address for a multicast (S,G), but does
- not have access to a relay address that can receive multicast
- traffic from the source, without administrative configuration.
-
- Defining a format for a TXT record could serve the need for AMT
- relay discovery semantics, but Section 5 of [RFC5507] provides a
- compelling argument for requesting a new RRType instead.
-
-G. What mnemonic is requested for the new RRTYPE (optional)?
- AMTRELAY
-
-H. Does the requested RRTYPE make use of any existing IANA registry
-   or require the creation of a new IANA subregistry in DNS
-   Parameters?
- Yes, IANA is requested to create a subregistry named "AMT Relay
- Type Field" in a "AMTRELAY Resource Record Parameters" registry.
- The field values are defined in Section 4.2.3 and Section 4.2.4,
- and a summary table is given in Section 5.
-
-I. Does the proposal require/expect any changes in DNS
-   servers/resolvers that prevent the new type from being processed
-   as an unknown RRTYPE (see RFC3597)?
- No.
-
-J. Comments:
- It may be worth noting that the gateway type field from Section 2.3 of
- [RFC4025] and Section 2.5 of [RFC4025] is very similar to the
- Relay Type field in this request.  I tentatively assume that trying to
- re-use that sub-registry is a worse idea than duplicating it, but I'll
- invite others to consider the question and voice an opinion, in case
- there is a different consensus.
-    https://www.ietf.org/assignments/
-        ipseckey-rr-parameters/ipseckey-rr-parameters.xml
-~~~
-
 #Unknown RRType construction {#extranslate}
 
 In a DNS resolver that understands the AMTRELAY type, the zone file might
@@ -1078,11 +1187,11 @@ as defined in {{RFC3597}}, one could run the following program:
         if len(dn) > 0:
           wire += ('%02x' % len(dn))
           wire += (''.join('%02x'%ord(x) for x in dn))
-      print(len(wire)//2)
+      print(len(wire)//2) + 2
       print(wire)
 
       $ ./translate.py amtrelays.example.com
-      22
+      24
       09616d7472656c617973076578616d706c6503636f6d
     <CODE ENDS>
 
@@ -1091,11 +1200,12 @@ the outputs of this program, yielding a length of 22 and the above hex string.
 
 22 is the length of the wire-encoded domain name, so to this we add 2 (1 for
 the precedence field and 1 for the combined D-bit and relay type fields) to
-get the full length of the RData.
+get the full length of the RData, and encode the precedence, D-bit, and
+relay type fields as octets, as described in {{rrdef}}.
 
 This results in a zone file entry like this:
 
-      IN TYPE65280  \# ( 24 ; length
+      IN TYPE260  \# ( 24 ; length
               80 ; precedence = 128
               03 ; D-bit=0, relay type=3 (wire-encoded domain name)
               09616d7472656c617973076578616d706c6503636f6d ) ; domain name
