@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-01
-date: 2019-02-14
+docname: draft-ietf-mboned-driad-amt-discovery-02
+date: 2019-03-08
 category: std
 
 ipr: trust200902
@@ -45,14 +45,19 @@ normative:
 
 informative:
   RFC2317:
+  RFC2845:
+  RFC2931:
   RFC3550:
-  RFC4033:
+  RFC4025:
+  RFC4301:
   RFC5110:
   RFC6726:
   RFC7359:
   RFC7761:
+  RFC7858:
   RFC8126:
   RFC8313:
+  RFC8484:
   RFC8499:
 
 --- abstract
@@ -1129,32 +1134,49 @@ Specification Required (as described in {{RFC8126}}).
 
 #Security Considerations
 
-\[ TBD: these 3 are just the first few most obvious issues, with just
-    sketches of the problem. Explain better, and look for trickier
-    issues. \]
+##Use of AMT
+
+This document defines a mechanism that enables a more widespread and
+automated use of AMT, even without access to a multicast backbone.
+Operators of networks and applications that include a DRIAD-capable
+AMT gateway are advised to carefully consider the security considerations
+in Section 6 of {{RFC7450}}.
+
+AMT gateway operators also are encouraged to implement the opportunistic
+use of IPSec {{RFC4301}} when IPSECKEY records {{RFC4025}} are available
+to secure traffic from AMT relays, or when a trust relationship with
+the AMT relays can be otherwise secured.
 
 ##Record-spoofing
 
-If AMT is used to ingest multicast traffic, providing a false AMTRELAY record
-to a gateway using it for discovery can result in Denial of Service, or
-artificial multicast traffic from a source under an attacker's control.
+The AMTRELAY resource record contains information that SHOULD be
+communicated to the DNS client without being modified.  The
+method used to ensure the result was unmodified is up to the client.
 
-Therefore, it is important to ensure that the AMTRELAY record is authentic,
-with DNSSEC {{RFC4033}} or other operational safeguards that can provide
-assurance of the authenticity of the record contents.
+There must be a trust relationship between the end consumer of this
+resource record and the DNS server.  This relationship may be end-to-end
+DNSSEC validation, a TSIG {{RFC2845}} or SIG(0) {{RFC2931}} channel
+to another secure source, a secure local channel on the host, DNS over
+TLS {{RFC7858}} or HTTPS {{RFC8484}}, or some other secure mechanism.
 
-##Local Override
-
-The local relays, while important for overall network performance, can't be
-secured by DNSSEC.
+If an AMT gateway accepts a maliciously crafted AMTRELAY record,
+the result could be a Denial of Service, or receivers processing
+multicast traffic from a source under the attacker's control.
 
 ##Congestion
 
-Multicast traffic, particularly interdomain multicast traffic, carries some
-congestion risks, as described in Section 4 of {{RFC8085}}. Network operators
-are advised to take precautions including monitoring of application traffic
-behavior, traffic authentication, and rate-limiting of multicast traffic, in
-order to ensure network health.
+Multicast traffic, particularly interdomain multicast traffic, carries
+some congestion risks, as described in Section 4 of {{RFC8085}}.
+
+Application implementors and network operators that use DRIAD-capable
+AMT gateways are advised to take precautions including monitoring of
+application traffic behavior, traffic authentication at ingest,
+rate-limiting of multicast traffic, and the use of circuit-breaker
+techniques such as those described in Section 3.1.10 of {{RFC8085}} and
+similar protections at the network level, in order to ensure network
+health in the event of misconfiguration, poorly written applications
+that don't follow UDP congestion control principles, or deliberate
+attack.
 
 #Acknowledgements
 
@@ -1163,7 +1185,8 @@ Robert Sayko, David Segelstein, and Percy Tarapore, presented in
 the MBONED working group at IETF 93.
 
 Thanks to Jeff Goldsmith, Toerless Eckert, Mikael Abrahamsson, Lenny
-Giuliano, and Mark Andrews for their very helpful comments.
+Giuliano, Mark Andrews, Sandy Zheng, Kyle Rose, and Ben Kaduk for
+their very helpful comments.
 
 --- back
 
