@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-02
-date: 2019-03-08
+docname: draft-ietf-mboned-driad-amt-discovery-03
+date: 2019-04-04
 category: std
 
 ipr: trust200902
@@ -126,6 +126,7 @@ receives the tunnel-encapsulated packets, decapsulates them, and forwards
 them as native multicast packets, as illustrated in {{figtunnel}}.
 
 ~~~
+
 
  Multicast  +-----------+  Unicast  +-------------+  Multicast
 >---------> | AMT relay | >=======> | AMT gateway | >--------->
@@ -352,7 +353,9 @@ an AMTRELAY RR owned by a sender when all of these conditions are met:
  4. The gateway is not able to find an upstream AMT relay with DNS-SD
     {{RFC6763}}, using "_amt._udp" as the Service section of the queries, or a
     relay discovered this way is not able to forward traffic from the source of
-    the (S,G) (as described in {{trafficabsent}} or {{loaded}}).
+    the (S,G) (as described in {{trafficabsent}} or {{loaded}}); and
+ 5. The gateway is not able to find an upstream AMT relay with the well-known
+    anycast addresses from Section 7 of {{RFC7450}}.
 
 When the above conditions are met, the gateway has no path within its local
 network that can receive multicast traffic from the source IP of the (S,G).
@@ -399,7 +402,22 @@ in the AMT discovery use case by the following considerations:
     AMT relays discoverable via the mechanism defined in this document
     (DRIAD).
 
- 2. Let Sender Manage Relay Provisioning
+ 2. Prefer Relays Managed by the Containing Network
+
+    When no local relay is discoverable with DNS-SD, it still may be the
+    case that a relay local to the receiver is operated by the network
+    providing transit services to the receiver.
+
+    In this case, when the network cannot make the relay discoverable via
+    DNS-SD, the network SHOULD use the well-known anycast addresses from
+    Section 7 of {{RFC7450}} to route discovery traffic to the relay most
+    appropriate to the receiver's gateway.
+
+    Accordingly, the gateway SHOULD by default discover a relay with the
+    well-known AMT anycast addresses as the second preference after DNS-SD
+    when searching for a local relay.
+
+ 3. Let Sender Manage Relay Provisioning
 
     A related motivating example in the sending-side network is provided by
     considering a sender which needs to instruct the gateways on how to
@@ -419,20 +437,10 @@ in the AMT discovery use case by the following considerations:
     precedence are directly compared according to the Destination Address
     Selection ordering.
 
- 3. Let Sender Manage Non-DRIAD discovery
-
-    It's also RECOMMENDED that if the well-known anycast IP addresses
-    defined in Section 7 of {{RFC7450}} are suitable for discovering an AMT
-    relay that can forward traffic from the source, that a DNS record with
-    the AMTRELAY RRType be published by the sender for those IP addresses
-    along with any other appropriate AMTRELAY RRs to indicate the best
-    relative precedences for receiving the source traffic.
-
-Accordingly, AMT gateways SHOULD by default prefer relays
-first by DNS-SD if available, then by DRIAD as described in this
-document (in precedence order, as described in {{rrdef-precedence}}), then
-with the anycast addresses defined in Section 7 of {{RFC7450}} (namely:
-192.52.193.1 and 2001:3::1) if those IPs weren't listed in the AMTRELAY RRs.
+Accordingly, AMT gateways SHOULD by default prefer relays first by DNS-SD
+if available, then with the anycast addresses defined in Section 7 of
+{{RFC7450}} (namely: 192.52.193.1 and 2001:3::1), then by DRIAD as described
+in this document (in precedence order, as described in {{rrdef-precedence}}).
 
 This default behavior MAY be overridden by administrative configuration where
 other behavior is more appropriate for the gateway within its network.
@@ -805,7 +813,7 @@ through a non-multicast next-hop.
 The office also hosts some mobile devices that have AMT gateway instances
 embedded inside apps, in order to receive multicast traffic over their
 non-multicast wireless LAN.  (Note that the "Legacy Router" is a
-simplification that's meant to describe a variety of possible conditions--
+simplification that's meant to describe a variety of possible conditions;
 for example it could be a device providing a split-tunnel VPN as described
 in {{RFC7359}}, deliberately excluding multicast traffic for a VPN
 tunnel, rather than a device which is incapable of multicast forwarding.)
