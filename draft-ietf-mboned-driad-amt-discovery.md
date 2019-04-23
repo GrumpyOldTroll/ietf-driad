@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-03
-date: 2019-04-04
+docname: draft-ietf-mboned-driad-amt-discovery-04
+date: 2019-04-22
 category: std
 
 ipr: trust200902
@@ -317,8 +317,9 @@ following normative definition:
    from a newly discovered relay a valid Membership Query message
    (Section 5.1.4 of {{RFC7450}}) that does not have the L flag set.
 
-See {{loaded}} for further information about the relevance of the L
-flag to the establishment of a Happy Eyeballs connection.
+See {{loaded}} of this document for further information about the
+relevance of the L flag to the establishment of a Happy Eyeballs
+connection.
 
 ##Optimal Relay Selection {#priority}
 
@@ -389,7 +390,7 @@ the addresses with the Destination Address Selection defined in Section
 6 of {{RFC6724}}, but for the above reasons, that requirement is superseded
 in the AMT discovery use case by the following considerations:
 
- 1. Prefer Local Relays
+ * Prefer Local Relays
 
     {{figrxoffice}} and {{exoffice}} provide a motivating example to prefer
     DNS-SD {{RFC6763}} for discovery strictly ahead of using the AMTRELAY RR
@@ -402,7 +403,7 @@ in the AMT discovery use case by the following considerations:
     AMT relays discoverable via the mechanism defined in this document
     (DRIAD).
 
- 2. Prefer Relays Managed by the Containing Network
+ * Prefer Relays Managed by the Containing Network
 
     When no local relay is discoverable with DNS-SD, it still may be the
     case that a relay local to the receiver is operated by the network
@@ -417,7 +418,7 @@ in the AMT discovery use case by the following considerations:
     well-known AMT anycast addresses as the second preference after DNS-SD
     when searching for a local relay.
 
- 3. Let Sender Manage Relay Provisioning
+ * Let Sender Manage Relay Provisioning
 
     A related motivating example in the sending-side network is provided by
     considering a sender which needs to instruct the gateways on how to
@@ -437,10 +438,13 @@ in the AMT discovery use case by the following considerations:
     precedence are directly compared according to the Destination Address
     Selection ordering.
 
-Accordingly, AMT gateways SHOULD by default prefer relays first by DNS-SD
-if available, then with the anycast addresses defined in Section 7 of
-{{RFC7450}} (namely: 192.52.193.1 and 2001:3::1), then by DRIAD as described
-in this document (in precedence order, as described in {{rrdef-precedence}}).
+Accordingly, AMT gateways SHOULD by default prefer relays in this order:
+
+~~~
+   1. DNS-SD
+   2. Anycast addresses from Section 7 of [RFC7450]
+   3. DRIAD
+~~~
 
 This default behavior MAY be overridden by administrative configuration where
 other behavior is more appropriate for the gateway within its network.
@@ -452,10 +456,13 @@ defined in Section 6 of {{RFC6724}}, as required by {{RFC8305}}.
 Among relay addresses that still have an equivalent preference after the
 above orderings, a gateway MUST make a non-deterministic choice for relay
 preference ordering, in order to support load balancing by DNS
-configurations that provide many relay options.  (Note that gateways not
-implementing a Happy Eyeballs algorithm are not required to use the
-Destination Address Selection ordering, but are still required to use
-non-deterministic ordering among equally preferred relays.)
+configurations that provide many relay options.
+
+The gateway MAY introduce a bias in the non-deterministic choice according
+to network topology or timing information obtained out of band or from a
+historical record.  The collection of this information is out of scope for
+this document, but a gateway in possession of such information MAY use it
+to prefer topologically closer relays.
 
 Note also that certain relay addresses may be excluded from consideration
 by the hold-down timers described in {{trafficabsent}} or {{loaded}}.  These
@@ -477,7 +484,7 @@ configured to do so without guaranteeing that adequate bandwidth is
 available.
 
 A gateway configured to do this SHOULD still use the same preference
-ordering logic from {{ordering}} for both connections.  (Note that
+ordering logic from {{ordering}} for each connection.  (Note that
 this ordering allows for overriding by explicit administrative
 configuration where required.)
 
@@ -894,7 +901,7 @@ When a sender network is also operating AMT relays to distribute multicast
 traffic, as in {{figtxrelay}}, each address could appear as an AMTRELAY RR
 for the reverse IP of the sender, or one or more domain names could appear
 in AMTRELAY RRs, and the AMT relay addresses can be discovered by finding
-a A or AAAA records from those domain names.
+A or AAAA records from those domain names.
 
 ~~~
                                       Sender Network
