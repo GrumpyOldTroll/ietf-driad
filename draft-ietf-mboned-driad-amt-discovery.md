@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-04
-date: 2019-04-22
+docname: draft-ietf-mboned-driad-amt-discovery-05
+date: 2019-04-25
 category: std
 
 ipr: trust200902
@@ -319,7 +319,9 @@ following normative definition:
 
 See {{loaded}} of this document for further information about the
 relevance of the L flag to the establishment of a Happy Eyeballs
-connection.
+connection.  See {{flowhealth}} for an overview of how to respond
+if the connection does not provide multicast connectivity to the
+source.
 
 ##Optimal Relay Selection {#priority}
 
@@ -459,10 +461,13 @@ preference ordering, in order to support load balancing by DNS
 configurations that provide many relay options.
 
 The gateway MAY introduce a bias in the non-deterministic choice according
-to network topology or timing information obtained out of band or from a
-historical record.  The collection of this information is out of scope for
-this document, but a gateway in possession of such information MAY use it
-to prefer topologically closer relays.
+to information obtained out of band or from a historical record about
+network topology, timing information, or the response to a probing
+mechanism, that indicates some expected benefits from selecting some relays
+in preference to others.  Details about the structure and collection of
+this information are out of scope for this document, but a gateway in
+possession of such information MAY use it to prefer topologically closer
+relays.
 
 Note also that certain relay addresses may be excluded from consideration
 by the hold-down timers described in {{trafficabsent}} or {{loaded}}.  These
