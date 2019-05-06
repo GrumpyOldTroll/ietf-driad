@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-05
-date: 2019-04-25
+docname: draft-ietf-mboned-driad-amt-discovery-06
+date: 2019-05-06
 category: std
 
 ipr: trust200902
@@ -1162,10 +1162,11 @@ Operators of networks and applications that include a DRIAD-capable
 AMT gateway are advised to carefully consider the security considerations
 in Section 6 of {{RFC7450}}.
 
-AMT gateway operators also are encouraged to implement the opportunistic
-use of IPSec {{RFC4301}} when IPSECKEY records {{RFC4025}} are available
-to secure traffic from AMT relays, or when a trust relationship with
-the AMT relays can be otherwise secured.
+AMT gateway operators also are encouraged to take appropriate steps to
+ensure the integrity of the data received via AMT, for example by the
+opportunistic use of IPSec {{RFC4301}} to secure traffic received from AMT
+relays, when IPSECKEY records {{RFC4025}} are available or when a trust
+relationship with the AMT relays can be otherwise established and secured.
 
 ##Record-spoofing
 
