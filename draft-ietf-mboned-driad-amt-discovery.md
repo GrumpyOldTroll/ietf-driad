@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-06
-date: 2019-05-06
+docname: draft-ietf-mboned-driad-amt-discovery-07
+date: 2019-06-13
 category: std
 
 ipr: trust200902
@@ -197,7 +197,7 @@ Section 3.4 of {{RFC8313}}, and Section 3.5 of {{RFC8313}}.
 ##Signaling and Discovery
 
 This section describes a typical example of the end-to-end process for
-signaling a receiver's join of a SSM channel that relies on an AMTRELAY
+signaling a receiver's join of an SSM channel that relies on an AMTRELAY
 RR.
 
 The example in {{figmessaging}} contains 2 multicast-enabled
@@ -215,7 +215,7 @@ The content provider provides the user with a receiving application that
 tries to subscribe to at least one (S,G).  This receiving application could
 for example be a file transfer system using FLUTE {{RFC6726}} or a live
 video stream using RTP {{RFC3550}}, or any other application that might
-subscribe to a SSM channel.
+subscribe to an SSM channel.
 
 ~~~
                  +---------------+
@@ -297,7 +297,7 @@ implement a Happy Eyeballs {{RFC8305}} algorithm to support connecting to
 multiple relays in parallel.
 
 The parallel discovery logic of a Happy Eyeballs algorithm serves to
-reduce join latency for the initial join of a SSM channel.  This section
+reduce join latency for the initial join of an SSM channel.  This section
 and {{ordering}} taken together provide guidance on use of a Happy
 Eyeballs algorithm for the case of establishing AMT connections.
 
@@ -423,7 +423,7 @@ in the AMT discovery use case by the following considerations:
  * Let Sender Manage Relay Provisioning
 
     A related motivating example in the sending-side network is provided by
-    considering a sender which needs to instruct the gateways on how to
+    considering a sender that needs to instruct the gateways on how to
     select between connecting to {{figtxrelay}} or {{figtxisp}} (from
     {{extx}}), in order to manage load and failover scenarios in a manner
     that operates well with the sender's provisioning strategy for
@@ -531,7 +531,7 @@ gateway to start or restart the discovery procedure.
 
 This document provides some updates and recommendations regarding the
 handling of these and similar events.  The first 5 events are copied
-here and numbered for easier reference, and the following events are
+here and numbered for easier reference, and the remaining 4 events are
 newly added for consideration in this document:
 
  1. When a gateway pseudo-interface is started (enabled).
@@ -548,7 +548,7 @@ newly added for consideration in this document:
  5. After the gateway receives a Membership Query message with the
     L flag set to 1.
 
- 6. When the gateway wishes to report a (S,G) subscription with a source
+ 6. When the gateway wishes to report an (S,G) subscription with a source
     address that does not currently have other group subscriptions.
 
  7. When there is a network change detected, for example when a gateway is
@@ -575,7 +575,7 @@ have sufficient information to use DRIAD, since no source is known.
 In general, subscribers to active traffic flows that are being forwarded
 by an AMT gateway are less likely to experience a degradation in service
 (for example, from missing or duplicated packets) when the gateway continues
-using the same relay, as long the relay is not overloaded and the network
+using the same relay, as long as the relay is not overloaded and the network
 conditions remain stable.
 
 Therefore, gateways SHOULD avoid performing a full restart of the discovery
@@ -707,7 +707,7 @@ will likely result in a smaller disruption to the traffic than if the relay
 simply stops responding to Request messages, and stops forwarding traffic.
 
 This style of Relay Discovery message (one sent to the unicast address
-of a relay that's already forwarding traffic to this gateway) should not be
+of a relay that's already forwarding traffic to this gateway) SHOULD NOT be
 considered a full restart of the relay discovery process.  It is recommended
 for gateways to support the L flag, but for gateways that do not support the
 L flag, sending this message during event #3 may help mitigate service
@@ -1206,8 +1206,8 @@ Robert Sayko, David Segelstein, and Percy Tarapore, presented in
 the MBONED working group at IETF 93.
 
 Thanks to Jeff Goldsmith, Toerless Eckert, Mikael Abrahamsson, Lenny
-Giuliano, Mark Andrews, Sandy Zheng, Kyle Rose, and Ben Kaduk for
-their very helpful comments.
+Giuliano, Mark Andrews, Sandy Zheng, Kyle Rose, Ben Kaduk, and Bill
+Atwood for their very helpful comments.
 
 --- back
 
