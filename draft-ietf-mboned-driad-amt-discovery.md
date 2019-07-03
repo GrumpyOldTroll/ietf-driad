@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-07
-date: 2019-06-13
+docname: draft-ietf-mboned-driad-amt-discovery-08
+date: 2019-06-14
 category: std
 
 ipr: trust200902
@@ -469,7 +469,7 @@ this information are out of scope for this document, but a gateway in
 possession of such information MAY use it to prefer topologically closer
 relays.
 
-Note also that certain relay addresses may be excluded from consideration
+Note also that certain relay addresses might be excluded from consideration
 by the hold-down timers described in {{trafficabsent}} or {{loaded}}.  These
 relays constitute "unusable destinations" under Rule 1 of the Destination
 Address Selection, and are also not part of the superseding considerations
@@ -679,12 +679,8 @@ for short-term subsequent rounds of discovery.
 
 ###Relay Discovery Messages vs. Restarting Discovery {#discoverymessage}
 
-A gateway should only send DNS queries with the AMTRELAY RRType or the
-DNS-SD DNS queries for an AMT service as part of starting or restarting the
-discovery process.
-
-However, all AMT relays are required to support handling of Relay Discovery
-messages (e.g. in Section 5.3.3.2 of {{RFC7450}}).
+All AMT relays are required by {{RFC7450}} to support handling of
+Relay Discovery messages (e.g. in Section 5.3.3.2 of {{RFC7450}}).
 
 So a gateway with an existing connection to a relay can send a Relay
 Discovery message to the unicast address of that AMT relay.  Under stable
@@ -708,7 +704,7 @@ simply stops responding to Request messages, and stops forwarding traffic.
 
 This style of Relay Discovery message (one sent to the unicast address
 of a relay that's already forwarding traffic to this gateway) SHOULD NOT be
-considered a full restart of the relay discovery process.  It is recommended
+considered a full restart of the relay discovery process.  It is RECOMMENDED
 for gateways to support the L flag, but for gateways that do not support the
 L flag, sending this message during event #3 may help mitigate service
 degradation when relays become unstable.
