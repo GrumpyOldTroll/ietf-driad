@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-08
-date: 2019-06-14
+docname: draft-ietf-mboned-driad-amt-discovery-09
+date: 2019-10-27
 category: std
 
 ipr: trust200902
@@ -30,6 +30,7 @@ normative:
   RFC1035:
   RFC2119:
   RFC2181:
+  RFC2782:
   RFC3376:
   RFC3596:
   RFC3597:
@@ -266,9 +267,9 @@ The sequence of events depicted in {{figmessaging}} is as follows:
 
  1. The end user starts the app, which issues a join to the (S,G):
     (198.51.100.15, 232.252.0.2).
- 2. The join propagates with RPF through the multicast-enabled network
-    with PIM {{RFC7761}} or another multicast routing mechanism, until the AMT
-    gateway receives a signal to join the (S,G).
+ 2. The join propagates with RPF through the receiver's multicast-enabled
+    network with PIM {{RFC7761}} or another multicast routing mechanism,
+    until the AMT gateway receives a signal to join the (S,G).
  3. The AMT gateway performs a reverse DNS lookup for the AMTRELAY RRType,
     by sending an AMTRELAY RRType query for the FQDN
     "15.100.51.198.in-addr.arpa.", using the reverse IP domain name for the
@@ -286,42 +287,6 @@ The sequence of events depicted in {{figmessaging}} is as follows:
     then forwards the appropriate AMT-encapsulated traffic to the
     gateway, which decapsulates and forwards it as native multicast through
     its downstream network to the end user.
-
-##Happy Eyeballs {#happy}
-
-###Overview
-
-Often, multiple choices of relay will exist for a gateway using DRIAD
-for relay discovery.  It is RECOMMENDED that DRIAD-capable gateways
-implement a Happy Eyeballs {{RFC8305}} algorithm to support connecting to
-multiple relays in parallel.
-
-The parallel discovery logic of a Happy Eyeballs algorithm serves to
-reduce join latency for the initial join of an SSM channel.  This section
-and {{ordering}} taken together provide guidance on use of a Happy
-Eyeballs algorithm for the case of establishing AMT connections.
-
-###Connection Definition
-
-Section 5 of {{RFC8305}} non-normatively describes success at a
-connection attempt as "generally when the TCP handshake completes".
-
-There is no normative definition of a connection in the AMT specification
-{{RFC7450}}, and there is no TCP connection involved in an AMT tunnel.
-
-However, the concept of an AMT connection in the context of a Happy
-Eyeballs algorithm is a useful one, and so this section provides the
-following normative definition:
-
- * An AMT connection is completed successfully when the gateway receives
-   from a newly discovered relay a valid Membership Query message
-   (Section 5.1.4 of {{RFC7450}}) that does not have the L flag set.
-
-See {{loaded}} of this document for further information about the
-relevance of the L flag to the establishment of a Happy Eyeballs
-connection.  See {{flowhealth}} for an overview of how to respond
-if the connection does not provide multicast connectivity to the
-source.
 
 ##Optimal Relay Selection {#priority}
 
@@ -373,19 +338,21 @@ provided by the sender.
 
 This section defines a preference ordering for relay addresses during
 the relay discovery process.  Gateways are encouraged to implement a
-Happy Eyeballs algorithm, but even gateways that do not implement a
-Happy Eyeballs algorithm SHOULD use this ordering, except as noted.
+Happy Eyeballs algorithm to try candidate relays concurrently, but even
+gateways that do not implement a Happy Eyeballs algorithm SHOULD use
+this ordering, except as noted.
 
 When establishing an AMT tunnel to forward multicast data, it's
 very important for the discovery process to prioritize the network
-topology considerations ahead of address selection considerations, in order to
-gain the packet replication benefits from using multicast instead of unicast
-tunneling in the multicast-capable portions of the network path.
+topology considerations ahead of address selection considerations, in
+order to gain the packet replication benefits from using multicast
+instead of unicast tunneling in the multicast-capable portions of the
+network path.
 
 The intent of the advice and requirements in this section is to describe
-how a gateway should make use of the concurrency provided by a Happy Eyeballs
-algorithm to reduce the join latency, while still prioritizing network
-efficiency considerations over Address Selection considerations.
+how a gateway should make use of the concurrency provided by a Happy
+Eyeballs algorithm to reduce the join latency, while still prioritizing
+network efficiency considerations over Address Selection considerations.
 
 Section 4 of {{RFC8305}} requires a Happy Eyeballs algorithm to sort
 the addresses with the Destination Address Selection defined in Section
@@ -492,6 +459,101 @@ A gateway configured to do this SHOULD still use the same preference
 ordering logic from {{ordering}} for each connection.  (Note that
 this ordering allows for overriding by explicit administrative
 configuration where required.)
+
+##Happy Eyeballs {#happy}
+
+###Overview
+
+Often, multiple choices of relay will exist for a gateway using DRIAD
+for relay discovery.  Happy Eyeballs {{RFC8305}} provides a widely
+deployed and generalizable strategy for probing multiple possible
+connections in parallel, therefore it is RECOMMENDED that DRIAD-capable
+gateways implement a Happy Eyeballs algorithm to support fast discovery
+of the most preferred available relay, by probing multiple relays
+concurrently.
+
+The parallel discovery logic of a Happy Eyeballs algorithm serves to
+reduce join latency for the initial join of an SSM channel.  This section
+and the preference ordering of relays defined in {{ordering}} taken
+together provide guidance on use of a Happy Eyeballs algorithm for the
+case of establishing AMT connections.
+
+Note that according to the definition in {{connection-def}} of this
+document, establishing the connection occurs before sending a membership
+report.  As described in Section 5 of {{RFC8085}}, only one of the
+successful connections will be used, and the others are all canceled
+or ignored.  In the context of an AMT connection, this means the gateway
+will send the membership reports that subscribe to traffic only for the
+chosen connection, after the Happy Eyeballs algorithm resolves.
+
+###Algorithm Guidelines
+
+During the "Initiation of asynchronous DNS queries" phase described in
+Section 3 of {{RFC8305}}), a gateway attempts to resolve the domain names
+listed in {{priority}}.  This consists of resolving the SRV queries for
+DNS-SD domains for the AMT service, as well as the AMTRELAY query for the
+reverse IP domain defined in this document.
+
+Each of the SRV and AMTRELAY responses might contain one or more IP
+addresses, (as with type 1 or type 2 AMTRELAY responses, or when the
+SRV Additional Data section of the SRV response contains the address
+records for the target, as urged by {{RFC2782}}), or they might
+contain only domain names (as with type 3 responses from {{rtype}}, or
+an SRV response without an additional data section).
+
+When present, IP addresses in the initial response provide resolved
+destination address candidates for the "Sorting of resolved
+destination addresses" phase described in Section 4 of {{RFC8085}}),
+whereas domain names without IP addresses in the initial response result
+in another set of queries for AAAA and A records, whose responses provide
+the candidate resolved destination addresses.
+
+Since the SRV or AMTRELAY responses don't have a bound on the count of
+queries that might be generated aside from the bounds imposed by the
+DNS resolver, it's important for the gateway to provide a rate limit on
+the DNS queries.  The DNS query functionality is expected to follow
+ordinary standards and best practices for DNS clients.  A gateway MAY
+use an existing DNS client implementation that does so, and MAY rely on
+that client's rate limiting logic to avoid issuing excessive queries.
+Otherwise, a gateway MUST provide a rate limit for the DNS queries, and
+its default settings MUST NOT permit more than 10 queries for any
+100-millisecond period (though this MAY be overridable by administrative
+configuration).
+
+As the resolved IP addresses arrive, the Happy Eyeballs algorithm
+sorts them according to the requirements and recommendations given in
+{{ordering}}, and attempts connections with the corresponding relays
+under the algorithm restrictions and guidelines given in {{RFC8085}} for
+the "Establishment of one connection, which cancels all other attempts"
+phase.
+
+###Connection Definition {#connection-def}
+
+Section 5 of {{RFC8305}} non-normatively describes success at a
+connection attempt as "generally when the TCP handshake completes".
+
+There is no normative definition of a connection in the AMT specification
+{{RFC7450}}, and there is no TCP connection involved in an AMT tunnel.
+
+However, the concept of an AMT connection in the context of a Happy
+Eyeballs algorithm is a useful one, and so this section provides the
+following normative definition:
+
+ * An AMT connection is completed successfully when the gateway receives
+   from a newly discovered relay a valid Membership Query message
+   (Section 5.1.4 of {{RFC7450}}) that does not have the L flag set.
+
+See {{loaded}} of this document for further information about the
+relevance of the L flag to the establishment of a Happy Eyeballs
+connection.  See {{flowhealth}} for an overview of how to respond
+if the connection does not provide multicast connectivity to the
+source.
+
+To "cancel" this kind of AMT connection for the Happy Eyeballs algorithm,
+a gateway that has not sent a membership report with a subscription
+would simply stop sending AMT packets for that connection.  A
+gateway only sends a membership report to a connection it has chosen as
+the most preferred available connection.
 
 ##Guidelines for Restarting Discovery
 
@@ -1202,8 +1264,8 @@ Robert Sayko, David Segelstein, and Percy Tarapore, presented in
 the MBONED working group at IETF 93.
 
 Thanks to Jeff Goldsmith, Toerless Eckert, Mikael Abrahamsson, Lenny
-Giuliano, Mark Andrews, Sandy Zheng, Kyle Rose, Ben Kaduk, and Bill
-Atwood for their very helpful comments.
+Giuliano, Mark Andrews, Sandy Zheng, Kyle Rose, Ben Kaduk, Bill
+Atwood, Tim Chown, and Warren Kumari for their very helpful comments.
 
 --- back
 
