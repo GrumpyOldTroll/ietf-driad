@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-09
-date: 2019-10-27
+docname: draft-ietf-mboned-driad-amt-discovery-10
+date: 2019-12-12
 category: std
 
 ipr: trust200902
@@ -51,6 +51,7 @@ informative:
   RFC3550:
   RFC4025:
   RFC4301:
+  RFC4787:
   RFC5110:
   RFC6726:
   RFC7359:
@@ -334,6 +335,14 @@ sender.  When the sender has configured an AMTRELAY RR, gateways can use the
 DRIAD mechanism defined in this document to discover the relay information
 provided by the sender.
 
+Note that the DNS-SD service is not source-specific, so even though
+several methods of finding a more local source of multicast traffic
+connectivity are preferred where available to using a relay
+provided by an AMTRELAY RR, a gateway further upstream would still be
+using the AMTRELAY RR unless the upstream network has a peering or
+direct connectivity that provides an alternative end-to-end multicast
+transport path for the (S,G)'s traffic.
+
 ###Preference Ordering {#ordering}
 
 This section defines a preference ordering for relay addresses during
@@ -539,7 +548,7 @@ However, the concept of an AMT connection in the context of a Happy
 Eyeballs algorithm is a useful one, and so this section provides the
 following normative definition:
 
- * An AMT connection is completed successfully when the gateway receives
+ * An AMT connection is established successfully when the gateway receives
    from a newly discovered relay a valid Membership Query message
    (Section 5.1.4 of {{RFC7450}}) that does not have the L flag set.
 
@@ -663,8 +672,9 @@ exponential back-off.
 
 The RECOMMENDED timeout is a random value in the range
 \[initial_timeout, MIN(initial_timeout * 2^retry_count, maximum_timeout)\],
-with a RECOMMENDED initial_timeout of 4 seconds and
-a RECOMMENDED maximum_timeout of 120 seconds.
+with a RECOMMENDED initial_timeout of 4 seconds and a RECOMMENDED
+maximum_timeout of 120 seconds (which is the recommended minimum NAT
+mapping timeout described in {{RFC4787}}).
 
 Note that the recommended initial_timeout is larger than the initial 
 timout recommended in the similar algorithm from Section 5.2.3.4.3 of
@@ -827,10 +837,11 @@ a RECOMMENDED maximum_timeout of 120 seconds.
 
 ##Example Receiving Networks {#exrx}
 
-###Tier 3 ISP {#exrxisp}
+###Internet Service Provider {#exrxisp}
 
-One example of a receiving network is an ISP that offers multicast ingest
-services to its subscribers, illustrated in {{figrxisp}}.
+One example of a receiving network is an Internet Service Provider (ISP)
+that offers multicast ingest services to its subscribers, illustrated in
+{{figrxisp}}.
 
 In the example network below, subscribers can join (S,G)s with MLDv2 or
 IGMPv3 as described in {{RFC4604}}, and the AMT gateway in this
@@ -1234,9 +1245,13 @@ method used to ensure the result was unmodified is up to the client.
 
 There must be a trust relationship between the end consumer of this
 resource record and the DNS server.  This relationship may be end-to-end
-DNSSEC validation, a TSIG {{RFC2845}} or SIG(0) {{RFC2931}} channel
-to another secure source, a secure local channel on the host, DNS over
-TLS {{RFC7858}} or HTTPS {{RFC8484}}, or some other secure mechanism.
+DNSSEC validation, or a secure connection to a trusted DNS server that
+provides end-to-end safety, to prevent record-spoofing of the response
+from the trusted server.  The connection to the trusted server can use
+any secure channel, such as with a TSIG {{RFC2845}} or SIG(0) {{RFC2931}}
+channel, a secure local channel on the host, DNS over TLS {{RFC7858}},
+DNS over HTTPS {{RFC8484}}, or some other mechanism that provides
+authentication of the RR.
 
 If an AMT gateway accepts a maliciously crafted AMTRELAY record,
 the result could be a Denial of Service, or receivers processing
@@ -1265,7 +1280,9 @@ the MBONED working group at IETF 93.
 
 Thanks to Jeff Goldsmith, Toerless Eckert, Mikael Abrahamsson, Lenny
 Giuliano, Mark Andrews, Sandy Zheng, Kyle Rose, Ben Kaduk, Bill
-Atwood, Tim Chown, and Warren Kumari for their very helpful comments.
+Atwood, Tim Chown, Warren Kumari, Dan Romanescu, Bernard Aboba,
+Carlos Pignataro, and Niclas Comstedt for their very helpful
+reviews and comments.
 
 --- back
 
