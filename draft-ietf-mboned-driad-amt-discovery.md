@@ -1,8 +1,8 @@
 ---
-title: DNS Reverse IP AMT Discovery
+title: DNS Reverse IP AMT (Automatic Multicast Tunneling) Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-10
-date: 2019-12-12
+docname: draft-ietf-mboned-driad-amt-discovery-12
+date: 2019-12-19
 category: std
 
 ipr: trust200902
@@ -43,6 +43,7 @@ normative:
   RFC8085:
   RFC8305:
   RFC8174:
+  RFC8499:
 
 informative:
   RFC2317:
@@ -60,16 +61,17 @@ informative:
   RFC8126:
   RFC8313:
   RFC8484:
-  RFC8499:
 
 --- abstract
 
 This document updates RFC 7450 (Automatic Multicast Tunneling, or AMT) by
-extending the relay discovery process to use a new DNS resource record named
-AMTRELAY when discovering AMT relays for source-specific multicast channels.
-The reverse IP DNS zone for a multicast sender's IP address is configured to
-use AMTRELAY resource records to advertise a set of AMT relays that can
-receive and forward multicast traffic from that sender over an AMT tunnel.
+modifying the relay discovery process.  A new DNS resource record named
+AMTRELAY is defined for publishing AMT relays for source-specific multicast
+channels.  The reverse IP DNS zone for a multicast sender's IP address is
+configured to use AMTRELAY resource records to advertise a set of AMT relays
+that can receive and forward multicast traffic from that sender over an AMT
+tunnel.  Other extensions and clarifications to the relay discovery
+process are also defined.
 
 --- middle
 
@@ -100,8 +102,8 @@ multicast-enabled networks when neither the sending nor the receiving network
 is connected to a multicast-enabled backbone, without pre-configuring any
 peering arrangement between the networks.
 
-This document updates Section 5.2.3.4 of {{RFC7450}} by adding a new
-extension to the relay discovery procedure.
+This document extends the relay discovery procedure described in Section
+5.2.3.4 of {{RFC7450}}.
 
 ##Background
 
@@ -145,19 +147,21 @@ discovery broker | A broker or load balancer for AMT relay discovery, as mention
 downstream | Further from the source of traffic, as described in {{RFC7450}}.
    FQDN | Fully Qualified Domain Name, as described in {{RFC8499}}
 gateway | An AMT gateway, as described in {{RFC7450}}
- L flag | The "Limit" flag described in Section 5.1.1.4 of {{RFC7450}}
+ L flag | The "Limit" flag described in Section 5.1.4.4 of {{RFC7450}}
   relay | An AMT relay, as described in {{RFC7450}}
     RPF | Reverse Path Forwarding, as described in {{RFC5110}}
      RR | A DNS Resource Record, as described in {{RFC1034}}
  RRType | A DNS Resource Record Type, as described in {{RFC1034}}
     SSM | Source-specific multicast, as described in {{RFC4607}}
 upstream | Closer to the source of traffic, as described in {{RFC7450}}.
+   CMTS | Cable Modem Termination System
+    OLT | Optical Line Terminal
 
-The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
-"SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
-"OPTIONAL" in this document are to be interpreted as described in
-{{RFC2119}} and {{RFC8174}} when, and only when, they appear in all
-capitals, as shown here.
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+"MAY", and "OPTIONAL" in this document are to be interpreted as
+described in BCP 14 {{RFC2119}} {{RFC8174}} when, and only when, they
+appear in all capitals, as shown here.
 
 #Relay Discovery Operation
 
@@ -222,7 +226,7 @@ subscribe to an SSM channel.
 ~~~
                  +---------------+
                  |    Sender     |
-  |    |         | 198.51.100.15 |
+  |    |         |  2001:db8::a  |
   |    |         +---------------+
   |Data|                 |
   |Flow|      Multicast  |
@@ -230,24 +234,24 @@ subscribe to an SSM channel.
   \    /                 |        5: Propagate RPF for Join(S,G)
    \  /          +---------------+
     \/           |   AMT Relay   |
-                 | 203.0.113.15  |
+                 | 2001:db8:c::f |
                  +---------------+
                          |        4: Gateway connects to Relay,
                                      sends Join(S,G) over tunnel
                          |
-                Unicast
-                 Tunnel  |
-
-     ^                   |        3: --> DNS Query: type=AMTRELAY,
-     |                           /         15.100.51.198.in-addr.arpa.
-     |                   |      /    <-- Response:
- Join/Leave       +-------------+          AMTRELAY=203.0.113.15
+                Unicast           3: --> DNS Query: type=AMTRELAY,
+                 Tunnel  |       /       a.0.0.0.0.0.0.0.0.0.0.0.
+                                /        0.0.0.0.0.0.0.0.0.0.0.0.
+     ^                   |     /         8.b.d.0.1.0.0.2.ip6.arpa
+     |                        /
+     |                   |   /       <-- Response:
+ Join/Leave       +-------------+         AMTRELAY=2001:db8:c::f
   Signals         | AMT gateway |
      |            +-------------+
      |                   |        2: Propagate RPF for Join(S,G)
      |        Multicast  |
                Network   |
-                         |        1: Join(S=198.51.100.15, G)
+                         |        1: Join(S=2001:db8::a,G=ff3e::8000:d)
                   +-------------+
                   |   Receiver  |
                   |  (end user) |
@@ -255,32 +259,37 @@ subscribe to an SSM channel.
 ~~~
 {: #figmessaging title="DRIAD Messaging"}
 
-In this simple example, the sender IP is 198.51.100.15, and the relay IP is
-203.0.113.15.
+In this simple example, the sender IP is 2001:db8::a, it is sending
+traffic to the group address ff3e::8000:d, and the relay IP is
+2001:db8::c:f.
 
 The content provider has previously configured the DNS zone that
-contains the domain name "15.100.51.198.in-addr.arpa.", which is the
-reverse lookup domain name for his sender.  The zone file contains an
-AMTRELAY RR with the Relay's IP address.  (See {{rpformat}} for
-details about the AMTRELAY RR format and semantics.)
+contains the reverse IP domain name for the sender's IP address
+so that it provides an AMTRELAY RR with the relay's IP address.
+(See {{rpformat}} for details about the AMTRELAY RR format and
+semantics.)  As described in Section 2.5 of {{RFC3596}}, the
+reverse IP FQDN of the sender's address "2001:db8::a" is:
+
+~~~
+a.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.
+                                                               arpa.
+~~~
 
 The sequence of events depicted in {{figmessaging}} is as follows:
 
  1. The end user starts the app, which issues a join to the (S,G):
-    (198.51.100.15, 232.252.0.2).
+    (2001:db8::a, ff3e::8000:d).
  2. The join propagates with RPF through the receiver's multicast-enabled
     network with PIM {{RFC7761}} or another multicast routing mechanism,
     until the AMT gateway receives a signal to join the (S,G).
  3. The AMT gateway performs a reverse DNS lookup for the AMTRELAY RRType,
-    by sending an AMTRELAY RRType query for the FQDN
-    "15.100.51.198.in-addr.arpa.", using the reverse IP domain name for the
-    sender's source IP address (the S from the (S,G)), as described in
-    Section 3.5 of {{RFC1035}}.
+    by sending an AMTRELAY RRType query for the reverse IP domain name
+    for the sender's source IP address (the S from the (S,G)).
 
     The DNS resolver for the AMT gateway uses ordinary DNS recursive
     resolution until it has the authoritative result that the content
     provider configured, which informs the AMT gateway that the relay address
-    is 203.0.113.15.
+    is 2001:db8::c:f.
  4. The AMT gateway performs AMT handshakes with the AMT relay as described
     in Section 4 of {{RFC7450}}, then forwards a Membership report to the
     relay indicating subscription to the (S,G).
@@ -288,6 +297,16 @@ The sequence of events depicted in {{figmessaging}} is as follows:
     then forwards the appropriate AMT-encapsulated traffic to the
     gateway, which decapsulates and forwards it as native multicast through
     its downstream network to the end user.
+
+In the case of an IPv4 (S,G), the only difference in the AMT relay
+discovery process is the use of the in-addr.arpa reverse IP domain name,
+as described in Section 3.5 of {{RFC1035}}, instead of the in6.arpa
+domain name.  For example, if the (S,G) is (198.51.100.12, 232.252.0.2),
+the reverse IP FQDN for the AMTRELAY query would be
+"12.100.51.198.in-addr.arpa.".
+
+Note that the address family of the AMT tunnel is independent of the
+address family for the multicast traffic.
 
 ##Optimal Relay Selection {#priority}
 
@@ -398,17 +417,18 @@ in the AMT discovery use case by the following considerations:
 
  * Let Sender Manage Relay Provisioning
 
-    A related motivating example in the sending-side network is provided by
-    considering a sender that needs to instruct the gateways on how to
-    select between connecting to {{figtxrelay}} or {{figtxisp}} (from
-    {{extx}}), in order to manage load and failover scenarios in a manner
-    that operates well with the sender's provisioning strategy for
-    horizontal scaling of AMT relays.
+    A related motivating example is provided by considering a sender whose
+    traffic can be forwarded by relays in a sender-controlled network
+    like {{figtxrelay}} in {{extxsnd}}, and also by relays in a
+    provider-controlled network like {{figtxisp}} in {{extxprv}}, with
+    different cost and scalability profiles for the different options.
 
     In this example about the sending-side network, the precedence field
     described in {{rrdef-precedence}} is a critical method of control so
     that senders can provide the appropriate guidance to gateways
-    during the discovery process.
+    during the discovery process, in order to manage load and failover
+    scenarios in a manner that operates well with the sender's
+    provisioning strategy for horizontal scaling of AMT relays.
 
     Therefore, after DNS-SD, the precedence from the RR MUST be used for
     sorting preference ahead of the Destination Address Selection ordering
@@ -428,13 +448,14 @@ This default behavior MAY be overridden by administrative configuration where
 other behavior is more appropriate for the gateway within its network.
 
 Among relay addresses that have an equivalent preference as described above, a
-Happy Eyeballs algorithm for AMT MUST use the Destination Address Selection
-defined in Section 6 of {{RFC6724}}, as required by {{RFC8305}}.
+Happy Eyeballs algorithm for AMT SHOULD use the Destination Address Selection
+defined in Section 6 of {{RFC6724}}.
 
 Among relay addresses that still have an equivalent preference after the
-above orderings, a gateway MUST make a non-deterministic choice for relay
-preference ordering, in order to support load balancing by DNS
-configurations that provide many relay options.
+above orderings, a gateway SHOULD make a non-deterministic choice (such as
+a pseudorandom selection) for relay preference ordering, in order to
+support load balancing by DNS configurations that provide many relay
+options.
 
 The gateway MAY introduce a bias in the non-deterministic choice according
 to information obtained out of band or from a historical record about
@@ -444,6 +465,10 @@ in preference to others.  Details about the structure and collection of
 this information are out of scope for this document, but a gateway in
 possession of such information MAY use it to prefer topologically closer
 relays.
+
+Within the above constraints, gateways MAY make use of other considerations
+from Section 4 of {{RFC8305}}, such as the address family interleaving
+strategies, to produce a final ordering of candidate relay addresses.
 
 Note also that certain relay addresses might be excluded from consideration
 by the hold-down timers described in {{trafficabsent}} or {{loaded}}.  These
@@ -489,7 +514,7 @@ case of establishing AMT connections.
 
 Note that according to the definition in {{connection-def}} of this
 document, establishing the connection occurs before sending a membership
-report.  As described in Section 5 of {{RFC8085}}, only one of the
+report.  As described in Section 5 of {{RFC8305}}, only one of the
 successful connections will be used, and the others are all canceled
 or ignored.  In the context of an AMT connection, this means the gateway
 will send the membership reports that subscribe to traffic only for the
@@ -512,7 +537,7 @@ an SRV response without an additional data section).
 
 When present, IP addresses in the initial response provide resolved
 destination address candidates for the "Sorting of resolved
-destination addresses" phase described in Section 4 of {{RFC8085}}),
+destination addresses" phase described in Section 4 of {{RFC8305}}),
 whereas domain names without IP addresses in the initial response result
 in another set of queries for AAAA and A records, whose responses provide
 the candidate resolved destination addresses.
@@ -525,16 +550,18 @@ ordinary standards and best practices for DNS clients.  A gateway MAY
 use an existing DNS client implementation that does so, and MAY rely on
 that client's rate limiting logic to avoid issuing excessive queries.
 Otherwise, a gateway MUST provide a rate limit for the DNS queries, and
-its default settings MUST NOT permit more than 10 queries for any
+its default settings SHOULD NOT permit more than 10 queries for any
 100-millisecond period (though this MAY be overridable by administrative
 configuration).
 
 As the resolved IP addresses arrive, the Happy Eyeballs algorithm
 sorts them according to the requirements and recommendations given in
 {{ordering}}, and attempts connections with the corresponding relays
-under the algorithm restrictions and guidelines given in {{RFC8085}} for
+under the algorithm restrictions and guidelines given in {{RFC8305}} for
 the "Establishment of one connection, which cancels all other attempts"
-phase.
+phase.  As described in Section 3 of {{RFC8305}}, DNS resolution is
+treated as asynchronous, and connection initiation does not wait
+for lagging DNS responses.
 
 ###Connection Definition {#connection-def}
 
@@ -628,8 +655,8 @@ newly added for consideration in this document:
     domain name changes in response to a DHCP message or administrative
     configuration.
 
- 8. When congestion or substantial loss is detected in the stream of AMT
-    packets from a relay.
+ 8. When substantial loss, persistent congestion, or network overload is
+    detected in the stream of AMT packets from a relay.
 
  9. When the gateway has reported one or more (S,G) subscriptions, but
     no traffic is received from the source for some timeout.  (See
@@ -805,8 +832,12 @@ mapping trees (in-addr.arpa for IPv4, as described in Section 3.5 of
 
 Therefore, it is RECOMMENDED that AMTRELAY RRs be added to reverse IP
 zones as appropriate.  AMTRELAY records MAY also appear in other zones,
-but the primary intended use case requires a reverse IP mapping for the source
-from an (S,G) in order to be useful to most AMT gateways.
+since this may be necessary to perform delegation from the reverse zones
+(see for example Section 5.2 of {{RFC2317}}), but the use case enabled
+by this document requires a reverse IP mapping for the source from an
+(S,G) in order to be useful to most AMT gateways.  This document does
+not define semantics for the use of AMTRELAY records obtained in a way
+other than by a reverse IP lookup.
 
 When performing the AMTRELAY RR lookup, any CNAMEs or DNAMEs found MUST be
 followed.  This is necessary to support zone delegation.  Some examples
@@ -969,7 +1000,7 @@ network in {{figrxisp}}.
 
 ##Example Sending Networks {#extx}
 
-###Sender-controlled Relays
+###Sender-controlled Relays {#extxsnd}
 
 When a sender network is also operating AMT relays to distribute multicast
 traffic, as in {{figtxrelay}}, each address could appear as an AMTRELAY RR
@@ -995,12 +1026,12 @@ A or AAAA records from those domain names.
 ~~~
 {: #figtxrelay title="Small Office Example"}
 
-###Provider-controlled Relays
+###Provider-controlled Relays {#extxprv}
 
 When an ISP offers a service to transmit outbound multicast traffic through
 a forwarding network, it might also offer AMT relays in order to reach
 receivers without multicast connectivity to the forwarding network, as in
-{{figtxisp}}. In this case it's RECOMMENDED that the ISP also provide at
+{{figtxisp}}. In this case it's recommended that the ISP also provide at
 least one domain name for the AMT relays for use with the AMTRELAY RR.
 
 When the sender wishes to use the relays provided by the ISP for
@@ -1110,6 +1141,9 @@ The following values are defined:
    MUST NOT be compressed.  (See Section 3.3 of {{RFC1035}} and Section 4 of
    {{RFC3597}}.)
 
+RRs with an undefined value in the Type field SHOULD NOT be considered
+by receiving gateways for AMT relay discovery.
+
 ###RData Format - Relay {#rdformat}
 
 The relay field is the address or domain name of the AMT relay. It is
@@ -1159,14 +1193,14 @@ the zone might contain a set of entries like this:
 
 ~~~
     $ORIGIN 100.51.198.in-addr.arpa.
-    10     IN AMTRELAY  10 0 1 203.0.113.15
-    10     IN AMTRELAY  10 0 2 2001:DB8::15
-    10     IN AMTRELAY 128 1 3 amtrelays.example.com.
+    12     IN AMTRELAY  10 0 1 203.0.113.15
+    12     IN AMTRELAY  10 0 2 2001:db8::15
+    12     IN AMTRELAY 128 1 3 amtrelays.example.com.
 ~~~
 
 This configuration advertises an IPv4 discovery address, an IPv6
 discovery address, and a domain name for AMT relays which can receive
-traffic from the source 198.51.100.10.  The IPv4 and IPv6 addresses
+traffic from the source 198.51.100.12.  The IPv4 and IPv6 addresses
 are configured with a D-bit of 0 (meaning discovery is mandatory, as
 described in {{rrdef-dbit}}), and a precedence 10 (meaning they're
 preferred ahead of the last entry, which has precedence 128).
@@ -1262,15 +1296,18 @@ multicast traffic from a source under the attacker's control.
 Multicast traffic, particularly interdomain multicast traffic, carries
 some congestion risks, as described in Section 4 of {{RFC8085}}.
 
-Application implementors and network operators that use DRIAD-capable
-AMT gateways are advised to take precautions including monitoring of
-application traffic behavior, traffic authentication at ingest,
-rate-limiting of multicast traffic, and the use of circuit-breaker
-techniques such as those described in Section 3.1.10 of {{RFC8085}} and
-similar protections at the network level, in order to ensure network
-health in the event of misconfiguration, poorly written applications
-that don't follow UDP congestion control principles, or deliberate
-attack.
+Application implementors and network operators that use AMT gateways
+are advised to take precautions including monitoring of application
+traffic behavior, traffic authentication at ingest, rate-limiting of
+multicast traffic, and the use of circuit-breaker techniques such as
+those described in Section 3.1.10 of {{RFC8085}} and similar
+protections at the network level, in order to ensure network health
+in the event of misconfiguration, poorly written applications that
+don't follow UDP congestion control principles, or deliberate attack.
+
+Section 4.1.4.2 of {{RFC7450}} and Section 6.1 of {{RFC7450}}
+provide some further considerations and advice about mitigating
+congestion risk.
 
 #Acknowledgements
 
@@ -1281,8 +1318,10 @@ the MBONED working group at IETF 93.
 Thanks to Jeff Goldsmith, Toerless Eckert, Mikael Abrahamsson, Lenny
 Giuliano, Mark Andrews, Sandy Zheng, Kyle Rose, Ben Kaduk, Bill
 Atwood, Tim Chown, Warren Kumari, Dan Romanescu, Bernard Aboba,
-Carlos Pignataro, and Niclas Comstedt for their very helpful
-reviews and comments.
+Carlos Pignataro, Niclas Comstedt, Mirja Kühlewind, Henning
+Rogge, Éric Vyncke, Barry Lieba, Roman Danyliw, Alissa Cooper,
+Suresh Krishnan, Adam Roach, and Daniel Franke for their very
+helpful reviews and comments.
 
 --- back
 
@@ -1314,13 +1353,14 @@ as defined in {{RFC3597}}, one could run the following program:
       09616d7472656c617973076578616d706c6503636f6d
     <CODE ENDS>
 
-The length and the hex string for the domain name "amtrelays.example.com" are
-the outputs of this program, yielding a length of 22 and the above hex string.
+The length of the RData and the hex string for the domain name
+"amtrelays.example.com" are the outputs of this program.
 
-22 is the length of the wire-encoded domain name, so to this we add 2 (1 for
-the precedence field and 1 for the combined D-bit and relay type fields) to
-get the full length of the RData, and encode the precedence, D-bit, and
-relay type fields as octets, as described in {{rrdef}}.
+22 is the length of the wire-encoded domain name, so 2 was added to
+that value (1 for the precedence field and 1 for the combined D-bit and
+relay type fields) to get the full length 24 of the RData.  For the 2
+octets ahead of the domain name, we encode the precedence, D-bit, and
+relay type fields, as described in {{rrdef}}.
 
 This results in a zone file entry like this:
 
