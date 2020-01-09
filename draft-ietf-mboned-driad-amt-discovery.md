@@ -1,8 +1,8 @@
 ---
 title: DNS Reverse IP AMT (Automatic Multicast Tunneling) Discovery
 abbrev: DRIAD
-docname: draft-ietf-mboned-driad-amt-discovery-12
-date: 2019-12-19
+docname: draft-ietf-mboned-driad-amt-discovery-13
+date: 2019-12-20
 category: std
 
 ipr: trust200902
@@ -163,9 +163,9 @@ NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
 described in BCP 14 {{RFC2119}} {{RFC8174}} when, and only when, they
 appear in all capitals, as shown here.
 
-#Relay Discovery Operation
+#Relay Discovery Overview
 
-##Overview
+##Basic Mechanics
 
 The AMTRELAY resource record (RR) defined in this document is used to
 publish the IP address or domain name of a set of AMT relays or discovery
@@ -239,12 +239,12 @@ subscribe to an SSM channel.
                          |        4: Gateway connects to Relay,
                                      sends Join(S,G) over tunnel
                          |
-                Unicast           3: --> DNS Query: type=AMTRELAY,
-                 Tunnel  |       /       a.0.0.0.0.0.0.0.0.0.0.0.
-                                /        0.0.0.0.0.0.0.0.0.0.0.0.
-     ^                   |     /         8.b.d.0.1.0.0.2.ip6.arpa
-     |                        /
-     |                   |   /       <-- Response:
+                Unicast          
+                 Tunnel  |        3: --> DNS Query: type=AMTRELAY,
+                                 /        a.0.0.0.0.0.0.0.0.0.0.0.
+     ^                   |      /         0.0.0.0.0.0.0.0.0.0.0.0.
+     |                         /          8.b.d.0.1.0.0.2.ip6.arpa
+     |                   |    /      <-- Response:
  Join/Leave       +-------------+         AMTRELAY=2001:db8:c::f
   Signals         | AMT gateway |
      |            +-------------+
@@ -308,6 +308,210 @@ the reverse IP FQDN for the AMTRELAY query would be
 Note that the address family of the AMT tunnel is independent of the
 address family for the multicast traffic.
 
+##Example Deployments {#exampledeployments}
+
+###Example Receiving Networks {#exrx}
+
+####Internet Service Provider {#exrxisp}
+
+One example of a receiving network is an Internet Service Provider (ISP)
+that offers multicast ingest services to its subscribers, illustrated in
+{{figrxisp}}.
+
+In the example network below, subscribers can join (S,G)s with MLDv2 or
+IGMPv3 as described in {{RFC4604}}, and the AMT gateway in this
+ISP can receive and forward multicast traffic from one of the example sending
+networks in {{extx}} by discovering the appropriate AMT relays with a DNS
+lookup for the AMTRELAY RR with the reverse IP of the source in the (S,G).
+
+~~~
+                    Internet
+                 ^            ^      Multicast-enabled
+                 |            |      Receiving Network
+          +------|------------|-------------------------+
+          |      |            |                         |
+          |  +--------+   +--------+    +=========+     |
+          |  | Border |---| Border |    |   AMT   |     |
+          |  | Router |   | Router |    | gateway |     |
+          |  +--------+   +--------+    +=========+     |
+          |      |            |              |          |
+          |      +-----+------+-----------+--+          |
+          |            |                  |             |
+          |      +-------------+    +-------------+     |
+          |      | Agg Routers | .. | Agg Routers |     |
+          |      +-------------+    +-------------+     |
+          |            /     \ \     /         \        |
+          | +---------------+         +---------------+ |
+          | |Access Systems | ....... |Access Systems | |
+          | |(CMTS/OLT/etc.)|         |(CMTS/OLT/etc.)| |
+          | +---------------+         +---------------+ |
+          |        |                        |           |
+          +--------|------------------------|-----------+
+                   |                        |
+             +---+-+-+---+---+        +---+-+-+---+---+
+             |   |   |   |   |        |   |   |   |   |
+            /-\ /-\ /-\ /-\ /-\      /-\ /-\ /-\ /-\ /-\
+            |_| |_| |_| |_| |_|      |_| |_| |_| |_| |_|
+
+                           Subscribers
+~~~
+{: #figrxisp title="Receiving ISP Example"}
+
+####Small Office {#exoffice}
+
+Another example receiving network is a small branch office that regularly
+accesses some multicast content, illustrated in {{figrxofficenm}}.
+
+This office has desktop devices that need to receive some multicast traffic,
+so an AMT gateway runs on a LAN with these devices, to pull traffic in
+through a non-multicast next-hop.
+
+The office also hosts some mobile devices that have AMT gateway instances
+embedded inside apps, in order to receive multicast traffic over their
+non-multicast wireless LAN.  (Note that the "Legacy Router" is a
+simplification that's meant to describe a variety of possible conditions;
+for example it could be a device providing a split-tunnel VPN as described
+in {{RFC7359}}, deliberately excluding multicast traffic for a VPN
+tunnel, rather than a device which is incapable of multicast forwarding.)
+
+~~~
+                 Internet
+              (non-multicast)
+                     ^
+                     |                  Office Network
+          +----------|----------------------------------+
+          |          |                                  |
+          |    +---------------+ (Wifi)   Mobile apps   |
+          |    | Modem+ | Wifi | - - - -  w/ embedded   |
+          |    | Router |  AP  |          AMT gateways  |
+          |    +---------------+                        |
+          |          |                                  |
+          |          |                                  |
+          |     +----------------+                      |
+          |     | Legacy Router  |                      |
+          |     |   (unicast)    |                      |
+          |     +----------------+                      |
+          |      /        |      \                      |
+          |     /         |       \                     |
+          | +--------+ +--------+ +--------+=========+  |
+          | | Phones | | ConfRm | | Desks  |   AMT   |  |
+          | | subnet | | subnet | | subnet | gateway |  |
+          | +--------+ +--------+ +--------+=========+  |
+          |                                             |
+          +---------------------------------------------+
+~~~
+{: #figrxofficenm title="Small Office (no multicast up)" :}
+
+By adding an AMT relay to this office network as in {{figrxoffice}}, it's
+possible to make use of multicast services from the example multicast-capable
+ISP in {{exrxisp}}.
+
+~~~
+           Multicast-capable ISP
+                     ^
+                     |                  Office Network
+          +----------|----------------------------------+
+          |          |                                  |
+          |    +---------------+ (Wifi)   Mobile apps   |
+          |    | Modem+ | Wifi | - - - -  w/ embedded   |
+          |    | Router |  AP  |          AMT gateways  |
+          |    +---------------+                        |
+          |          |               +=======+          |
+          |          +---Wired LAN---|  AMT  |          |
+          |          |               | relay |          |
+          |     +----------------+   +=======+          |
+          |     | Legacy Router  |                      |
+          |     |   (unicast)    |                      |
+          |     +----------------+                      |
+          |      /        |      \                      |
+          |     /         |       \                     |
+          | +--------+ +--------+ +--------+=========+  |
+          | | Phones | | ConfRm | | Desks  |   AMT   |  |
+          | | subnet | | subnet | | subnet | gateway |  |
+          | +--------+ +--------+ +--------+=========+  |
+          |                                             |
+          +---------------------------------------------+
+~~~
+{: #figrxoffice title="Small Office Example"}
+
+When multicast-capable networks are chained like this, with a network like
+the one in {{figrxoffice}} receiving internet services from a
+multicast-capable network like the one in {{figrxisp}}, it's important for
+AMT gateways to reach the more local AMT relay, in order to avoid
+accidentally tunneling multicast traffic from a more distant AMT relay with
+unicast, and failing to utilize the multicast transport capabilities of the
+network in {{figrxisp}}.
+
+###Example Sending Networks {#extx}
+
+####Sender-controlled Relays {#extxsnd}
+
+When a sender network is also operating AMT relays to distribute multicast
+traffic, as in {{figtxrelay}}, each address could appear as an AMTRELAY RR
+for the reverse IP of the sender, or one or more domain names could appear
+in AMTRELAY RRs, and the AMT relay addresses can be discovered by finding
+A or AAAA records from those domain names.
+
+~~~
+                                      Sender Network
+                +-----------------------------------+
+                |                                   |
+                | +--------+   +=======+  +=======+ |
+                | | Sender |   |  AMT  |  |  AMT  | |
+                | +--------+   | relay |  | relay | |
+                |     |        +=======+  +=======+ |
+                |     |            |          |     |
+                |     +-----+------+----------+     |
+                |           |                       |
+                +-----------|-----------------------+
+                            v
+                         Internet
+                      (non-multicast)
+~~~
+{: #figtxrelay title="Small Office Example"}
+
+####Provider-controlled Relays {#extxprv}
+
+When an ISP offers a service to transmit outbound multicast traffic through
+a forwarding network, it might also offer AMT relays in order to reach
+receivers without multicast connectivity to the forwarding network, as in
+{{figtxisp}}. In this case it's recommended that the ISP also provide at
+least one domain name for the AMT relays for use with the AMTRELAY RR.
+
+When the sender wishes to use the relays provided by the ISP for
+forwarding multicast traffic, an AMTRELAY RR should be configured to use
+the domain name provided by the ISP, to allow for address reassignment of the
+relays without forcing the sender to reconfigure the corresponding AMTRELAY
+RRs.
+
+~~~
+                  +--------+
+                  | Sender |
+                  +---+----+        Multicast-enabled
+                      |              Sending Network
+          +-----------|-------------------------------+
+          |           v                               |
+          |    +------------+     +=======+ +=======+ |
+          |    | Agg Router |     |  AMT  | |  AMT  | |
+          |    +------------+     | relay | | relay | |
+          |           |           +=======+ +=======+ |
+          |           |               |         |     |
+          |     +-----+------+--------+---------+     |
+          |     |            |                        |
+          | +--------+   +--------+                   |
+          | | Border |---| Border |                   |
+          | | Router |   | Router |                   |
+          | +--------+   +--------+                   |
+          +-----|------------|------------------------+
+                |            |
+                v            v
+                   Internet
+                (non-multicast)
+~~~
+{: #figtxisp title="Sending ISP Example"}
+
+#Relay Discovery Operation
+
 ##Optimal Relay Selection {#priority}
 
 ###Overview
@@ -325,7 +529,7 @@ that relay is better for the gateway to use, since more of the network path
 uses native multicast, allowing more chances for packet replication.  But since
 that relay is not known to the sender, it won't be advertised in the sender's
 reverse IP DNS record.  An example network that illustrates this scenario is
-outlined in {{exoffice}}.
+outlined in {{figrxoffice}} from {{exoffice}}.
 
 It's only appropriate for an AMT gateway to discover an AMT relay by querying
 an AMTRELAY RR owned by a sender when all of these conditions are met:
@@ -355,12 +559,12 @@ DRIAD mechanism defined in this document to discover the relay information
 provided by the sender.
 
 Note that the DNS-SD service is not source-specific, so even though
-several methods of finding a more local source of multicast traffic
-connectivity are preferred where available to using a relay
+when available, several methods of finding a more local source of
+multicast traffic connectivity are preferred to using a relay
 provided by an AMTRELAY RR, a gateway further upstream would still be
-using the AMTRELAY RR unless the upstream network has a peering or
-direct connectivity that provides an alternative end-to-end multicast
-transport path for the (S,G)'s traffic.
+using the AMTRELAY RR unless the upstream network has a peering
+that provides an alternative end-to-end multicast transport path for
+the (S,G)'s traffic.
 
 ###Preference Ordering {#ordering}
 
@@ -864,208 +1068,6 @@ in the range \[initial_timeout, MIN(initial_timeout * 2^retry_count,
 maximum_timeout)\], with a RECOMMENDED initial_timeout of 1 second and
 a RECOMMENDED maximum_timeout of 120 seconds.
 
-#Example Deployments {#exampledeployments}
-
-##Example Receiving Networks {#exrx}
-
-###Internet Service Provider {#exrxisp}
-
-One example of a receiving network is an Internet Service Provider (ISP)
-that offers multicast ingest services to its subscribers, illustrated in
-{{figrxisp}}.
-
-In the example network below, subscribers can join (S,G)s with MLDv2 or
-IGMPv3 as described in {{RFC4604}}, and the AMT gateway in this
-ISP can receive and forward multicast traffic from one of the example sending
-networks in {{extx}} by discovering the appropriate AMT relays with a DNS
-lookup for the AMTRELAY RR with the reverse IP of the source in the (S,G).
-
-~~~
-                    Internet
-                 ^            ^      Multicast-enabled
-                 |            |      Receiving Network
-          +------|------------|-------------------------+
-          |      |            |                         |
-          |  +--------+   +--------+    +=========+     |
-          |  | Border |---| Border |    |   AMT   |     |
-          |  | Router |   | Router |    | gateway |     |
-          |  +--------+   +--------+    +=========+     |
-          |      |            |              |          |
-          |      +-----+------+-----------+--+          |
-          |            |                  |             |
-          |      +-------------+    +-------------+     |
-          |      | Agg Routers | .. | Agg Routers |     |
-          |      +-------------+    +-------------+     |
-          |            /     \ \     /         \        |
-          | +---------------+         +---------------+ |
-          | |Access Systems | ....... |Access Systems | |
-          | |(CMTS/OLT/etc.)|         |(CMTS/OLT/etc.)| |
-          | +---------------+         +---------------+ |
-          |        |                        |           |
-          +--------|------------------------|-----------+
-                   |                        |
-             +---+-+-+---+---+        +---+-+-+---+---+
-             |   |   |   |   |        |   |   |   |   |
-            /-\ /-\ /-\ /-\ /-\      /-\ /-\ /-\ /-\ /-\
-            |_| |_| |_| |_| |_|      |_| |_| |_| |_| |_|
-
-                           Subscribers
-~~~
-{: #figrxisp title="Receiving ISP Example"}
-
-###Small Office {#exoffice}
-
-Another example receiving network is a small branch office that regularly
-accesses some multicast content, illustrated in {{figrxofficenm}}.
-
-This office has desktop devices that need to receive some multicast traffic,
-so an AMT gateway runs on a LAN with these devices, to pull traffic in
-through a non-multicast next-hop.
-
-The office also hosts some mobile devices that have AMT gateway instances
-embedded inside apps, in order to receive multicast traffic over their
-non-multicast wireless LAN.  (Note that the "Legacy Router" is a
-simplification that's meant to describe a variety of possible conditions;
-for example it could be a device providing a split-tunnel VPN as described
-in {{RFC7359}}, deliberately excluding multicast traffic for a VPN
-tunnel, rather than a device which is incapable of multicast forwarding.)
-
-~~~
-                 Internet
-              (non-multicast)
-                     ^
-                     |                  Office Network
-          +----------|----------------------------------+
-          |          |                                  |
-          |    +---------------+ (Wifi)   Mobile apps   |
-          |    | Modem+ | Wifi | - - - -  w/ embedded   |
-          |    | Router |  AP  |          AMT gateways  |
-          |    +---------------+                        |
-          |          |                                  |
-          |          |                                  |
-          |     +----------------+                      |
-          |     | Legacy Router  |                      |
-          |     |   (unicast)    |                      |
-          |     +----------------+                      |
-          |      /        |      \                      |
-          |     /         |       \                     |
-          | +--------+ +--------+ +--------+=========+  |
-          | | Phones | | ConfRm | | Desks  |   AMT   |  |
-          | | subnet | | subnet | | subnet | gateway |  |
-          | +--------+ +--------+ +--------+=========+  |
-          |                                             |
-          +---------------------------------------------+
-~~~
-{: #figrxofficenm title="Small Office (no multicast up)" :}
-
-By adding an AMT relay to this office network as in {{figrxoffice}}, it's
-possible to make use of multicast services from the example multicast-capable
-ISP in {{exrxisp}}.
-
-~~~
-           Multicast-capable ISP
-                     ^
-                     |                  Office Network
-          +----------|----------------------------------+
-          |          |                                  |
-          |    +---------------+ (Wifi)   Mobile apps   |
-          |    | Modem+ | Wifi | - - - -  w/ embedded   |
-          |    | Router |  AP  |          AMT gateways  |
-          |    +---------------+                        |
-          |          |               +=======+          |
-          |          +---Wired LAN---|  AMT  |          |
-          |          |               | relay |          |
-          |     +----------------+   +=======+          |
-          |     | Legacy Router  |                      |
-          |     |   (unicast)    |                      |
-          |     +----------------+                      |
-          |      /        |      \                      |
-          |     /         |       \                     |
-          | +--------+ +--------+ +--------+=========+  |
-          | | Phones | | ConfRm | | Desks  |   AMT   |  |
-          | | subnet | | subnet | | subnet | gateway |  |
-          | +--------+ +--------+ +--------+=========+  |
-          |                                             |
-          +---------------------------------------------+
-~~~
-{: #figrxoffice title="Small Office Example"}
-
-When multicast-capable networks are chained like this, with a network like
-the one in {{figrxoffice}} receiving internet services from a
-multicast-capable network like the one in {{figrxisp}}, it's important for
-AMT gateways to reach the more local AMT relay, in order to avoid
-accidentally tunneling multicast traffic from a more distant AMT relay with
-unicast, and failing to utilize the multicast transport capabilities of the
-network in {{figrxisp}}.
-
-##Example Sending Networks {#extx}
-
-###Sender-controlled Relays {#extxsnd}
-
-When a sender network is also operating AMT relays to distribute multicast
-traffic, as in {{figtxrelay}}, each address could appear as an AMTRELAY RR
-for the reverse IP of the sender, or one or more domain names could appear
-in AMTRELAY RRs, and the AMT relay addresses can be discovered by finding
-A or AAAA records from those domain names.
-
-~~~
-                                      Sender Network
-                +-----------------------------------+
-                |                                   |
-                | +--------+   +=======+  +=======+ |
-                | | Sender |   |  AMT  |  |  AMT  | |
-                | +--------+   | relay |  | relay | |
-                |     |        +=======+  +=======+ |
-                |     |            |          |     |
-                |     +-----+------+----------+     |
-                |           |                       |
-                +-----------|-----------------------+
-                            v
-                         Internet
-                      (non-multicast)
-~~~
-{: #figtxrelay title="Small Office Example"}
-
-###Provider-controlled Relays {#extxprv}
-
-When an ISP offers a service to transmit outbound multicast traffic through
-a forwarding network, it might also offer AMT relays in order to reach
-receivers without multicast connectivity to the forwarding network, as in
-{{figtxisp}}. In this case it's recommended that the ISP also provide at
-least one domain name for the AMT relays for use with the AMTRELAY RR.
-
-When the sender wishes to use the relays provided by the ISP for
-forwarding multicast traffic, an AMTRELAY RR should be configured to use
-the domain name provided by the ISP, to allow for address reassignment of the
-relays without forcing the sender to reconfigure the corresponding AMTRELAY
-RRs.
-
-~~~
-                  +--------+
-                  | Sender |
-                  +---+----+        Multicast-enabled
-                      |              Sending Network
-          +-----------|-------------------------------+
-          |           v                               |
-          |    +------------+     +=======+ +=======+ |
-          |    | Agg Router |     |  AMT  | |  AMT  | |
-          |    +------------+     | relay | | relay | |
-          |           |           +=======+ +=======+ |
-          |           |               |         |     |
-          |     +-----+------+--------+---------+     |
-          |     |            |                        |
-          | +--------+   +--------+                   |
-          | | Border |---| Border |                   |
-          | | Router |   | Router |                   |
-          | +--------+   +--------+                   |
-          +-----|------------|------------------------+
-                |            |
-                v            v
-                   Internet
-                (non-multicast)
-~~~
-{: #figtxisp title="Sending ISP Example"}
-
 #AMTRELAY Resource Record Definition {#rrdef}
 
 ##AMTRELAY RRType
@@ -1271,6 +1273,14 @@ opportunistic use of IPSec {{RFC4301}} to secure traffic received from AMT
 relays, when IPSECKEY records {{RFC4025}} are available or when a trust
 relationship with the AMT relays can be otherwise established and secured.
 
+Note that AMT does not itself provide any integrity protection on
+Multicast Data packets (Section 5.1.6 of {{RFC7450}}), so absent
+protections like those mentioned above, even an off-path attacker who
+discovers the gateway IP, the relay IP, and the relay source port for
+an active AMT connection can inject multicast data packets for a
+joined (S,G) into the data stream if he can get data packets delivered
+to the gateway IP that spoof the relay as the source.
+
 ##Record-spoofing
 
 The AMTRELAY resource record contains information that SHOULD be
@@ -1317,11 +1327,11 @@ the MBONED working group at IETF 93.
 
 Thanks to Jeff Goldsmith, Toerless Eckert, Mikael Abrahamsson, Lenny
 Giuliano, Mark Andrews, Sandy Zheng, Kyle Rose, Ben Kaduk, Bill
-Atwood, Tim Chown, Warren Kumari, Dan Romanescu, Bernard Aboba,
-Carlos Pignataro, Niclas Comstedt, Mirja Kühlewind, Henning
-Rogge, Éric Vyncke, Barry Lieba, Roman Danyliw, Alissa Cooper,
-Suresh Krishnan, Adam Roach, and Daniel Franke for their very
-helpful reviews and comments.
+Atwood, Tim Chown, Christian Worm Mortensen, Warren Kumari, Dan
+Romanescu, Bernard Aboba, Carlos Pignataro, Niclas Comstedt,
+Mirja Kühlewind, Henning Rogge, Éric Vyncke, Barry Lieba,
+Roman Danyliw, Alissa Cooper, Suresh Krishnan, Adam Roach,
+and Daniel Franke for their very helpful reviews and comments.
 
 --- back
 
