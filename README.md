@@ -1,8 +1,8 @@
 #  DNS Reverse IP AMT Discovery
 
-This is the working area for the individual Internet-Draft, "DNS Reverse IP AMT Discovery".
+This is the working area for the Internet-Draft, "DNS Reverse IP AMT Discovery".
 
-* [Individual Draft](https://tools.ietf.org/html/draft-jholland-mboned-driad-amt-discovery-00)
+* [MBONED Draft](https://datatracker.ietf.org/doc/draft-ietf-mboned-driad-amt-discovery/)
 
 ## Building the Draft
 
